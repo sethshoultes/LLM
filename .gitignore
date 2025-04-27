@@ -36,6 +36,7 @@ llm_env/
 ._*
 .Spotlight-V100
 .Trashes
+.fseventsd/
 ehthumbs.db
 Thumbs.db
 
