@@ -114,7 +114,7 @@ class SimpleModelManager:
                     # Load the model with reasonable defaults
                     model = Llama(
                         model_path=full_path,
-                        n_ctx=2048,        # Context window
+                        n_ctx=2048,        # Context window - restored to default
                         n_batch=512        # Batch size
                     )
                     
@@ -143,7 +143,7 @@ class SimpleModelManager:
                     # Load the model with reasonable defaults
                     model = Llama(
                         model_path=full_path,
-                        n_ctx=2048,        # Context window
+                        n_ctx=2048,        # Context window - restored to default
                         n_batch=512,       # Batch size
                         legacy=True        # Required for GGML models
                     )

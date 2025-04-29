@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Error - {{ error_title|default("System Error") }}</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+            background-color: #f5f7f9;
+        }
+        .error-card {
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 2rem;
+            margin-bottom: 2rem;
+            border-left: 5px solid #e53935;
+        }
+        h1, h2 {
+            margin-top: 0;
+            color: #2a2a2a;
+        }
+        pre {
+            background: #f5f5f5;
+            padding: 1rem;
+            border-radius: 4px;
+            overflow: auto;
+            white-space: pre-wrap;
+        }
+        .error-code {
+            font-size: 0.8rem;
+            color: #666;
+            margin-top: 1rem;
+        }
+        .action-button {
+            background-color: #0070f3;
+            color: white;
+            border: none;
+            padding: 0.8rem 1.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            text-decoration: none;
+            display: inline-block;
+            margin-top: 1rem;
+        }
+        .action-button:hover {
+            background-color: #0051a2;
+        }
+    </style>
+</head>
+<body>
+    <div class="error-card">
+        <h1>{{ error_title|default("System Error") }}</h1>
+        <p>{{ error_message|default("An unexpected error occurred.") }}</p>
+        
+        {% if error_detail %}
+        <h2>Error Details</h2>
+        <pre>{{ error_detail }}</pre>
+        {% endif %}
+        
+        {% if error_code %}
+        <div class="error-code">Error code: {{ error_code }}</div>
+        {% endif %}
+        
+        <a href="/" class="action-button">Return to Home</a>
+        <a href="javascript:location.reload()" class="action-button">Reload Page</a>
+    </div>
+    
+    {% if show_debug and debug_info %}
+    <div class="error-card">
+        <h2>Debug Information</h2>
+        <pre>{{ debug_info }}</pre>
+    </div>
+    {% endif %}
+</body>
+</html>

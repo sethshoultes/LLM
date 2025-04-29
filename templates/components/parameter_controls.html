@@ -1,0 +1,31 @@
+<div class="parameter-controls">
+    <h3>Generation Parameters</h3>
+    <div class="parameter-row">
+        <label for="temperature" title="Controls randomness: higher values make output more random, lower values make it more deterministic">
+            Temperature: <span id="tempValue">0.7</span>
+        </label>
+        <input type="range" id="temperature" min="0.1" max="2.0" step="0.1" value="0.7" 
+               oninput="document.getElementById('tempValue').textContent = this.value">
+    </div>
+    <div class="parameter-row">
+        <label for="maxTokens" title="Maximum number of tokens to generate in the response">
+            Max Tokens: <span id="tokenValue">1024</span>
+        </label>
+        <input type="range" id="maxTokens" min="64" max="4096" step="64" value="1024" 
+               oninput="document.getElementById('tokenValue').textContent = this.value">
+    </div>
+    <div class="parameter-row">
+        <label for="topP" title="Controls diversity via nucleus sampling: 0.9 means consider only tokens comprising the top 90% probability mass">
+            Top P: <span id="topPValue">0.95</span>
+        </label>
+        <input type="range" id="topP" min="0.05" max="1.0" step="0.05" value="0.95" 
+               oninput="document.getElementById('topPValue').textContent = this.value">
+    </div>
+    <div class="parameter-row">
+        <label for="freqPenalty" title="Reduces repetition by lowering the probability of tokens that have already appeared in the text">
+            Frequency Penalty: <span id="freqValue">0.0</span>
+        </label>
+        <input type="range" id="freqPenalty" min="0.0" max="2.0" step="0.1" value="0.0" 
+               oninput="document.getElementById('freqValue').textContent = this.value">
+    </div>
+</div>

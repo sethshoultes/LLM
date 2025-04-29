@@ -1,0 +1,201 @@
+<div class="context-bar" id="contextBar" style="display: none;">
+    <div class="context-header">
+        <h3>Context Documents</h3>
+        <div class="context-controls">
+            <button class="secondary-btn clear-context-btn" id="clearContextBtn">Clear All</button>
+            <div class="toggle-switch">
+                <label for="autoContextToggle">Auto-suggest:</label>
+                <label class="switch">
+                    <input type="checkbox" id="autoContextToggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+    </div>
+    
+    <div class="context-items" id="contextItems"></div>
+    
+    <div class="context-stats" id="contextStats">
+        <div class="token-usage">
+            <div class="token-bar">
+                <div class="token-used" id="tokenUsed" style="width: 0%"></div>
+            </div>
+            <div class="token-label">
+                <span id="tokenCount">0</span>/<span id="tokenLimit">2048</span> tokens
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Styles moved to main.css -->
+<!-- 
+<style>
+.context-bar {
+    background: #f5f7fa;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border: 1px solid #e1e4e8;
+}
+
+.context-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.context-header h3 {
+    margin: 0;
+    font-size: 1rem;
+}
+
+.context-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+}
+
+.clear-context-btn {
+    padding: 0.3rem 0.6rem;
+    font-size: 0.8rem;
+}
+
+.context-items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    min-height: 30px;
+}
+
+.context-item {
+    background: #e6f7ff;
+    border-radius: 6px;
+    padding: 0.3rem 0.5rem;
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    border: 1px solid #91d5ff;
+}
+
+.context-item-title {
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.context-item-remove {
+    cursor: pointer;
+    color: #999;
+    font-size: 1rem;
+}
+
+.context-item-remove:hover {
+    color: #666;
+}
+
+.context-stats {
+    margin-top: 0.8rem;
+    font-size: 0.75rem;
+    color: #666;
+}
+
+.token-usage {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.token-bar {
+    height: 6px;
+    background: #f0f0f0;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.token-used {
+    height: 100%;
+    background: #1890ff;
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+.token-label {
+    display: flex;
+    justify-content: flex-end;
+}
+
+/* Token usage colors */
+.token-low {
+    background: #52c41a;
+}
+
+.token-medium {
+    background: #faad14;
+}
+
+.token-high {
+    background: #f5222d;
+}
+
+/* Toggle switch styling */
+.toggle-switch {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.toggle-switch label {
+    font-size: 0.8rem;
+    color: #666;
+}
+
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 30px;
+    height: 16px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: .2s;
+    border-radius: 16px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 12px;
+    width: 12px;
+    left: 2px;
+    bottom: 2px;
+    background-color: white;
+    transition: .2s;
+    border-radius: 50%;
+}
+
+input:checked + .slider {
+    background-color: #1890ff;
+}
+
+input:checked + .slider:before {
+    transform: translateX(14px);
+}
+-->
+<!-- Styles moved to main CSS file -->

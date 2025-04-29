@@ -6,10 +6,10 @@ This guide explains how to use the Retrieval-Augmented Generation (RAG) features
 ## Getting Started
 
 ### Launching RAG-Enhanced Interface
-To use the RAG features, launch the interface with the RAG-specific script:
+To use the RAG features, launch the interface with the RAG option:
 
 ```bash
-./llm_rag.sh
+./llm.sh --rag
 ```
 
 This will start the familiar interface with additional RAG capabilities in a sidebar.

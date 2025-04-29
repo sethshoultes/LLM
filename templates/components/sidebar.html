@@ -1,0 +1,56 @@
+<div class="sidebar" id="sidebar">
+    <button class="sidebar-toggle" id="sidebarToggle" title="Toggle Sidebar">⋮</button>
+    
+    <div class="sidebar-section">
+        <h3>Projects</h3>
+        <div class="project-selector">
+            <button class="secondary-btn action-button" id="newProjectBtn">
+                + New Project
+            </button>
+        </div>
+        <div id="projectList" class="project-list">
+            <!-- Projects will be loaded here -->
+            <div class="empty-state">Loading projects...</div>
+        </div>
+        <div class="project-info" id="projectInfo">
+            <div class="token-counter" id="tokenCounter">No documents selected</div>
+        </div>
+    </div>
+    
+    <div class="sidebar-section">
+        <h3>Documents</h3>
+        <div class="action-bar">
+            <button class="secondary-btn action-button" id="addDocumentBtn">
+                + Add Document
+            </button>
+            <div class="spacer"></div>
+            <button class="secondary-btn action-button" id="refreshDocsBtn" title="Refresh documents">
+                ↻
+            </button>
+        </div>
+        
+        <div class="search-container">
+            <input type="text" class="search-input" id="documentSearch" placeholder="Search documents...">
+            <button class="clear-search" id="clearSearch">×</button>
+        </div>
+        
+        <div class="document-list" id="documentList">
+            <div class="empty-state">No documents found</div>
+        </div>
+    </div>
+    
+    <!-- Document preview dialog -->
+    <div id="documentPreview" class="document-preview">
+        <div class="preview-header">
+            <h3 id="previewTitle">Document Preview</h3>
+            <button class="preview-close" id="closePreview">×</button>
+        </div>
+        <div class="preview-content" id="previewContent"></div>
+        <div class="preview-actions">
+            <button class="secondary-btn" id="addToContextBtn">Add to Context</button>
+        </div>
+    </div>
+</div>
+
+<!-- Script moved to components.js -->
+<!-- Sidebar toggle functionality is now part of the RAGSidebar component -->

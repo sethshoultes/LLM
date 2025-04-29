@@ -1,0 +1,17 @@
+<div id="chatHistory" class="chat-history"></div>
+
+<div class="message-input">
+    <textarea id="userInput" placeholder="Enter your message here..."></textarea>
+    <button id="sendBtn">Send</button>
+    <div id="spinner" class="loading" style="display: none;"></div>
+</div>
+
+<div class="chat-controls">
+    <button id="newChatBtn" class="secondary-btn">New Chat</button>
+    <button id="exportChatBtn" class="secondary-btn">Export Chat</button>
+    <!-- Extension point for CHAT_CONTROLS -->
+</div>
+
+{% include "components/parameter_controls.html" %}
+
+<div id="stats" class="stats" style="display: none;"></div>
