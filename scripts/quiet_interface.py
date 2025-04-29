@@ -775,8 +775,37 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
         # Handle RAG API requests if enabled
         if RAG_ENABLED and parsed_path.path.startswith('/api/projects'):
             try:
-                # Import the RAG API handler
-                from rag_support.api_extensions import api_handler
+                # Import and initialize the RAG API handler
+                try:
+                    # Ensure the rag_support package is properly loaded
+                    import sys
+                    import importlib
+                    
+                    # Make sure the rag_support package is in the path
+                    if str(BASE_DIR) not in sys.path:
+                        sys.path.insert(0, str(BASE_DIR))
+                    
+                    # Reload the modules to ensure latest changes are loaded
+                    if 'rag_support' in sys.modules:
+                        importlib.reload(sys.modules['rag_support'])
+                    
+                    # Import the package and initialize directories
+                    import rag_support
+                    rag_support.init_directories()
+                    
+                    # Import API handler
+                    import rag_support.api_extensions
+                    importlib.reload(rag_support.api_extensions)
+                    from rag_support.api_extensions import api_handler
+                    
+                    print(f"Successfully imported and initialized RAG API handler")
+                except Exception as e:
+                    print(f"Error importing RAG API handler: {e}")
+                    if DEBUG_MODE:
+                        import traceback
+                        traceback.print_exc()
+                    self.send_error(500, explain=f"Failed to initialize API handler: {str(e)}")
+                    return
                 
                 # Parse query parameters
                 query_params = {}
@@ -923,8 +952,37 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
         # Handle RAG API requests if enabled
         if RAG_ENABLED and (parsed_path.path.startswith('/api/projects') or parsed_path.path.startswith('/api/tokens')):
             try:
-                # Import the RAG API handler
-                from rag_support.api_extensions import api_handler
+                # Import and initialize the RAG API handler
+                try:
+                    # Ensure the rag_support package is properly loaded
+                    import sys
+                    import importlib
+                    
+                    # Make sure the rag_support package is in the path
+                    if str(BASE_DIR) not in sys.path:
+                        sys.path.insert(0, str(BASE_DIR))
+                    
+                    # Reload the modules to ensure latest changes are loaded
+                    if 'rag_support' in sys.modules:
+                        importlib.reload(sys.modules['rag_support'])
+                    
+                    # Import the package and initialize directories
+                    import rag_support
+                    rag_support.init_directories()
+                    
+                    # Import API handler
+                    import rag_support.api_extensions
+                    importlib.reload(rag_support.api_extensions)
+                    from rag_support.api_extensions import api_handler
+                    
+                    print(f"Successfully imported and initialized RAG API handler")
+                except Exception as e:
+                    print(f"Error importing RAG API handler: {e}")
+                    if DEBUG_MODE:
+                        import traceback
+                        traceback.print_exc()
+                    self.send_error(500, explain=f"Failed to initialize API handler: {str(e)}")
+                    return
                 
                 # Read POST data
                 content_length = int(self.headers['Content-Length'])

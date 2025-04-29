@@ -163,6 +163,10 @@ class SimpleSearch:
             return []
         
         for doc_path in documents_dir.glob("*.md"):
+            # Skip hidden files and macOS metadata files
+            if doc_path.name.startswith(".") or doc_path.name.startswith("._"):
+                continue
+                
             try:
                 with open(doc_path, "r") as f:
                     content = f.read()
@@ -213,6 +217,10 @@ class SimpleSearch:
     
     def get_document(self, project_id: str, doc_id: str) -> Optional[Dict[str, Any]]:
         """Get a document by ID"""
+        # Skip hidden files
+        if doc_id.startswith(".") or doc_id.startswith("._"):
+            return None
+            
         doc_path = PROJECTS_DIR / project_id / "documents" / f"{doc_id}.md"
         
         if not doc_path.exists():

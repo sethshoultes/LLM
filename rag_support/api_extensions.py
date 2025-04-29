@@ -2,10 +2,19 @@
 # api_extensions.py - Extensions to the quiet_interface.py API for RAG support
 
 import os
+import sys
 import json
 import urllib.parse
+import time
+import traceback
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Union, Tuple
+
+# Enable logging for debugging
+import logging
+logging.basicConfig(level=logging.DEBUG, 
+                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 # Import BASE_DIR from rag_support
 try:
@@ -18,8 +27,22 @@ except ImportError:
     # Use environment variable if available
     BASE_DIR = Path(os.environ.get("LLM_BASE_DIR", str(BASE_DIR)))
 
+# Set up paths
+scripts_dir = Path(BASE_DIR) / "scripts"
+if str(scripts_dir) not in sys.path:
+    sys.path.append(str(scripts_dir))
+
 # Import RAG utilities
-from rag_support.utils import project_manager, search_engine
+from rag_support.utils import project_manager
+from rag_support.utils.search import search_engine
+
+# Try to import inference module now so it's available to all methods
+try:
+    import minimal_inference_quiet as minimal_inference
+    HAS_INFERENCE_MODULE = True
+except ImportError:
+    HAS_INFERENCE_MODULE = False
+    logging.warning("Could not import minimal_inference_quiet module. Some features may not work.")
 
 class RagApiHandler:
     """Handles RAG-related API requests for the quiet_interface"""
@@ -92,8 +115,17 @@ class RagApiHandler:
         Returns:
             Tuple of (status_code, response_dict)
         """
+        # Add detailed logging for debugging
+        logging.debug(f"API Request: {method} {path}")
+        logging.debug(f"Query params: {query_params}")
+        logging.debug(f"Body: {body}")
+        
+        # Initialize defaults
         query_params = query_params or {}
         body = body or {}
+        
+        # No fallbacks allowed - we need to fix the actual issues
+        # Just add logging to help diagnose problems
         
         # Parse path to determine endpoint
         parts = path.strip('/').split('/')
@@ -211,17 +243,41 @@ class RagApiHandler:
     def _list_projects(self) -> Tuple[int, Dict[str, Any]]:
         """List all projects"""
         try:
+            # Log debug information
+            logging.debug("Entering _list_projects method")
+            
+            # Access project_manager safely
+            if not hasattr(project_manager, 'get_projects'):
+                logging.error("project_manager does not have get_projects method")
+                return self._format_error_response(
+                    500,
+                    "Invalid project manager configuration",
+                    "The project manager object is missing required methods",
+                    "project_manager_error"
+                )
+            
+            # Get the projects with detailed logging
+            logging.debug("Calling project_manager.get_projects()")
             projects = project_manager.get_projects()
+            logging.debug(f"Retrieved {len(projects) if projects else 0} projects")
+            
+            # Create response metadata
             meta = {
                 "count": len(projects),
                 "timestamp": datetime.now().isoformat()
             }
+            
+            logging.debug("Formatting success response")
             return self._format_success_response(
                 data=projects,
                 message="Projects retrieved successfully",
                 meta=meta
             )
         except Exception as e:
+            # Log the full exception with traceback
+            logging.error(f"Error in _list_projects: {str(e)}")
+            logging.error(traceback.format_exc())
+            
             return self._format_error_response(
                 500,
                 "Failed to retrieve projects",
@@ -568,16 +624,9 @@ class RagApiHandler:
             
             # Get AI response by connecting to the LLM generation code
             try:
-                import sys
-                from pathlib import Path
-                
-                # Ensure the scripts directory is in the path
-                scripts_dir = Path(BASE_DIR) / "scripts"
-                if str(scripts_dir) not in sys.path:
-                    sys.path.append(str(scripts_dir))
-                
-                # Import the inference module
-                import minimal_inference_quiet as minimal_inference
+                # Check if inference module is available
+                if not HAS_INFERENCE_MODULE:
+                    raise ImportError("Inference module was not successfully imported")
                 
                 # Get available models if none specified
                 if not modelPath:
@@ -736,16 +785,9 @@ class RagApiHandler:
             # Try to get model-specific context window
             if model_path:
                 try:
-                    import sys
-                    from pathlib import Path
-                    
-                    # Ensure the scripts directory is in the path
-                    scripts_dir = Path(BASE_DIR) / "scripts"
-                    if str(scripts_dir) not in sys.path:
-                        sys.path.append(str(scripts_dir))
-                    
-                    # Import the inference module
-                    import minimal_inference_quiet as minimal_inference
+                    # Check if inference module is available
+                    if not HAS_INFERENCE_MODULE:
+                        raise ImportError("Inference module was not successfully imported")
                     
                     # Get model info if available
                     models = minimal_inference.list_models()
@@ -903,4 +945,10 @@ class RagApiHandler:
         return 200, {"message": "Artifact deleted"}
 
 # Create a singleton instance
-api_handler = RagApiHandler()
+try:
+    api_handler = RagApiHandler()
+    logging.info("Successfully created RagApiHandler instance")
+except Exception as e:
+    logging.error(f"Error creating RagApiHandler instance: {e}")
+    logging.error(traceback.format_exc())
+    raise

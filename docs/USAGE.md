@@ -216,7 +216,7 @@ When the model uses context from your documents, it will reference the source do
 
 ### RAG Specific Issues
 
-- **Missing RAG Features**: Ensure you're starting with `./llm.sh rag`
+- **Missing RAG Features**: Ensure you're starting with `./llm.sh --rag`
 - **Module Import Errors**: Check console output for Python import errors
 - **Empty Projects List**: Create your first project using the "New Project" button
 - **Documents Not Showing Up**: Verify you're in the correct project

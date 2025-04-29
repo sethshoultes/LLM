@@ -191,12 +191,28 @@ LLM.Components = {
             };
             
             // Get context documents if RAG is enabled
-            const contextDocs = LLM.Components.RAGSidebar ? 
-                LLM.Components.RAGSidebar.getSelectedDocuments() : [];
+            let contextDocs = [];
+            let projectId = null;
+            
+            // Check RAG components
+            if (LLM.Components.RAGSidebar) {
+                contextDocs = LLM.Components.RAGSidebar.getSelectedDocuments();
+                projectId = LLM.Components.RAGSidebar.getCurrentProject();
+            }
+            
+            // If using auto-suggest, suggest relevant documents
+            if (LLM.Components.ContextManager && LLM.Components.ContextManager.autoSuggest) {
+                LLM.Components.ContextManager.suggestDocuments(message);
+                
+                // Update context docs with the latest from ContextManager after suggesting
+                if (LLM.Components.ContextManager.getDocuments().length > 0) {
+                    contextDocs = LLM.Components.ContextManager.getDocuments().map(doc => doc.id);
+                }
+            }
                 
             if (contextDocs && contextDocs.length > 0) {
                 params.context_docs = contextDocs;
-                params.project_id = LLM.Components.RAGSidebar.getCurrentProject();
+                params.project_id = projectId;
             }
             
             // Send message to API
@@ -363,6 +379,7 @@ LLM.Components = {
         maxTokens: 2048,
         currentTokens: 0,
         autoSuggest: false,
+        currentProject: null,
         
         // Initialize the component
         init: function() {
@@ -400,15 +417,17 @@ LLM.Components = {
             // Add document to context
             this.documents.push(doc);
             
-            // Update token count
-            this.currentTokens += doc.tokens || 0;
-            
-            // Update UI
-            this.updateUI();
+            // Set current project if not already set
+            if (!this.currentProject && LLM.Components.RAGSidebar) {
+                this.currentProject = LLM.Components.RAGSidebar.getCurrentProject();
+            }
             
             // Show context bar
             const contextBar = document.getElementById('contextBar');
             if (contextBar) contextBar.style.display = 'block';
+            
+            // Update token counts via API
+            this.updateTokenCounts();
         },
         
         // Remove document from context
@@ -417,14 +436,11 @@ LLM.Components = {
             const docIndex = this.documents.findIndex(d => d.id === docId);
             if (docIndex === -1) return;
             
-            // Subtract tokens
-            this.currentTokens -= this.documents[docIndex].tokens || 0;
-            
             // Remove document from context
             this.documents.splice(docIndex, 1);
             
-            // Update UI
-            this.updateUI();
+            // Update UI with new token counts
+            this.updateTokenCounts();
             
             // Hide context bar if empty
             if (this.documents.length === 0) {
@@ -443,6 +459,64 @@ LLM.Components = {
             if (contextBar) contextBar.style.display = 'none';
         },
         
+        // Update token counts from API
+        updateTokenCounts: function() {
+            // Show loading state
+            const tokenCount = document.getElementById('tokenCount');
+            const tokenUsed = document.getElementById('tokenUsed');
+            
+            if (tokenCount) tokenCount.textContent = 'Calculating...';
+            if (tokenUsed) tokenUsed.style.width = '0%';
+            
+            // Update the UI first with what we have
+            this.updateUI();
+            
+            // If no documents or no project, just return
+            if (this.documents.length === 0 || !this.currentProject) {
+                return;
+            }
+            
+            // Get document IDs
+            const documentIds = this.documents.map(doc => doc.id);
+            
+            // Call API to get token counts
+            API.RAG.getTokenInfo(this.currentProject, documentIds)
+                .then(data => {
+                    const tokenData = data.data || {};
+                    
+                    // Update token counts
+                    this.currentTokens = tokenData.total_tokens || 0;
+                    this.maxTokens = tokenData.model_context_window || 2048;
+                    
+                    // Update documents with individual token counts
+                    const contexts = tokenData.contexts || [];
+                    contexts.forEach(context => {
+                        const doc = this.documents.find(d => d.id === context.id);
+                        if (doc) {
+                            doc.tokens = context.tokens;
+                            doc.percentage = context.percentage;
+                        }
+                    });
+                    
+                    // Update UI with new token counts
+                    this.updateUI();
+                    
+                    // Add warning if over limit
+                    if (tokenData.is_over_limit) {
+                        const contextBar = document.getElementById('contextBar');
+                        if (contextBar) contextBar.classList.add('token-warning');
+                    } else {
+                        const contextBar = document.getElementById('contextBar');
+                        if (contextBar) contextBar.classList.remove('token-warning');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error updating token counts:', error);
+                    // Still update UI with what we have
+                    this.updateUI();
+                });
+        },
+        
         // Update context UI
         updateUI: function() {
             const contextItems = document.getElementById('contextItems');
@@ -457,8 +531,12 @@ LLM.Components = {
             this.documents.forEach(doc => {
                 const item = document.createElement('div');
                 item.className = 'context-item';
+                
+                // Include token count if available
+                const tokenInfo = doc.tokens ? ` (${doc.tokens} tokens)` : '';
+                
                 item.innerHTML = `
-                    <div class="context-item-title" title="${doc.title}">${doc.title}</div>
+                    <div class="context-item-title" title="${doc.title}">${doc.title}${tokenInfo}</div>
                     <div class="context-item-remove" data-id="${doc.id}">×</div>
                 `;
                 contextItems.appendChild(item);
@@ -472,7 +550,7 @@ LLM.Components = {
                 }
             });
             
-            // Update token count
+            // Update token count display
             tokenCount.textContent = this.currentTokens;
             tokenLimit.textContent = this.maxTokens;
             
@@ -493,13 +571,51 @@ LLM.Components = {
         
         // Suggest documents based on message
         suggestDocuments: function(message) {
-            if (!this.autoSuggest) return;
+            if (!this.autoSuggest || !this.currentProject) return;
             
-            // In a real implementation, this would make an API call to the backend
-            console.log('Auto-suggesting context for:', message);
+            const contextItems = document.getElementById('contextItems');
+            if (!contextItems) return;
             
-            // For now, we'll just display a placeholder message
-            console.log('Auto-suggest is enabled but not implemented yet');
+            // Show loading state
+            const suggestionIndicator = document.createElement('div');
+            suggestionIndicator.className = 'suggestion-indicator';
+            suggestionIndicator.textContent = 'Finding relevant documents...';
+            contextItems.appendChild(suggestionIndicator);
+            
+            // Call the API to get suggestions
+            API.RAG.suggestDocuments(this.currentProject, message)
+                .then(data => {
+                    // Remove loading indicator
+                    contextItems.removeChild(suggestionIndicator);
+                    
+                    const suggestions = data.suggestions || [];
+                    
+                    if (suggestions.length === 0) {
+                        console.log('No document suggestions found');
+                        return;
+                    }
+                    
+                    // Add suggested documents to context
+                    suggestions.forEach(suggestion => {
+                        // Only add if not already in context
+                        if (!this.documents.some(d => d.id === suggestion.id)) {
+                            API.RAG.getDocument(this.currentProject, suggestion.id)
+                                .then(doc => {
+                                    this.addDocument(doc);
+                                })
+                                .catch(error => {
+                                    console.error('Error fetching suggested document:', error);
+                                });
+                        }
+                    });
+                })
+                .catch(error => {
+                    console.error('Error getting document suggestions:', error);
+                    // Remove loading indicator
+                    if (suggestionIndicator.parentNode === contextItems) {
+                        contextItems.removeChild(suggestionIndicator);
+                    }
+                });
         },
         
         // Get all documents in context
@@ -632,17 +748,55 @@ LLM.Components = {
         },
         
         // Show document preview dialog
-        showDocumentPreview: function(doc) {
+        showDocumentPreview: function(docId) {
             const preview = document.getElementById('documentPreview');
             const title = document.getElementById('previewTitle');
             const content = document.getElementById('previewContent');
             
             if (!preview || !title || !content) return;
             
+            // Show loading state
+            preview.style.display = 'flex';
+            title.textContent = 'Loading...';
+            content.innerHTML = '<div class="loading-spinner"></div>';
+            
+            // Check if we already have the document loaded
+            let doc = null;
+            if (typeof docId === 'object' && docId !== null) {
+                // If a document object was passed directly, use it
+                doc = docId;
+                this.displayDocumentPreview(doc, title, content);
+            } else {
+                // Otherwise fetch the document by ID
+                API.RAG.getDocument(this.currentProject, docId)
+                    .then(data => {
+                        console.log("Document preview API response:", data);
+                        
+                        // Handle different response formats
+                        let document = data;
+                        if (data.data) {
+                            // Standard success response format
+                            document = data.data;
+                        }
+                        
+                        this.displayDocumentPreview(document, title, content);
+                    })
+                    .catch(error => {
+                        content.innerHTML = `<div class="error-message">Error loading document: ${error.message}</div>`;
+                    });
+            }
+        },
+        
+        // Display document in preview panel
+        displayDocumentPreview: function(doc, titleElement, contentElement) {
+            // Store reference to the document
             this.previewedDocument = doc;
             
-            title.textContent = doc.title || 'Document Preview';
-            content.innerHTML = `<div class="preview-text">${doc.content || 'No content available'}</div>`;
+            // Update title
+            titleElement.textContent = doc.title || 'Document Preview';
+            
+            // Update content
+            contentElement.innerHTML = `<div class="preview-text">${doc.content || 'No content available'}</div>`;
             
             // Add metadata if available
             if (doc.metadata) {
@@ -656,11 +810,8 @@ LLM.Components = {
                         </ul>
                     </div>
                 `;
-                content.innerHTML += metaHTML;
+                contentElement.innerHTML += metaHTML;
             }
-            
-            // Show the preview
-            preview.style.display = 'flex';
         },
         
         // Close document preview dialog
@@ -692,31 +843,179 @@ LLM.Components = {
                 return;
             }
             
-            // For demo purposes, just show a simple prompt
-            const title = prompt('Enter document title:');
-            const content = prompt('Enter document content:');
+            // Create a form for document upload
+            const dialog = document.createElement('div');
+            dialog.className = 'modal-dialog';
+            dialog.innerHTML = `
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>Add Document</h3>
+                        <button class="close-button">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="documentUploadForm">
+                            <div class="form-group">
+                                <label for="documentTitle">Title</label>
+                                <input type="text" id="documentTitle" class="form-control" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="documentContent">Content</label>
+                                <textarea id="documentContent" class="form-control" rows="10" required></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label for="documentTags">Tags (comma-separated)</label>
+                                <input type="text" id="documentTags" class="form-control">
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button id="cancelDocumentBtn" class="secondary-btn">Cancel</button>
+                        <button id="submitDocumentBtn" class="primary-btn">Add Document</button>
+                    </div>
+                </div>
+            `;
             
-            if (title && content) {
-                // In a real implementation, this would make an API call
-                alert('Document upload is not implemented in this demo. In a real system, this would upload the document to the selected project.');
-            }
+            // Add the dialog to the page
+            document.body.appendChild(dialog);
+            
+            // Set up event listeners
+            const closeButton = dialog.querySelector('.close-button');
+            const cancelButton = document.getElementById('cancelDocumentBtn');
+            const submitButton = document.getElementById('submitDocumentBtn');
+            
+            const closeDialog = () => {
+                document.body.removeChild(dialog);
+            };
+            
+            closeButton.addEventListener('click', closeDialog);
+            cancelButton.addEventListener('click', closeDialog);
+            
+            submitButton.addEventListener('click', () => {
+                const title = document.getElementById('documentTitle').value.trim();
+                const content = document.getElementById('documentContent').value.trim();
+                const tagsInput = document.getElementById('documentTags').value.trim();
+                
+                if (!title || !content) {
+                    alert('Please provide both title and content');
+                    return;
+                }
+                
+                // Parse tags
+                const tags = tagsInput ? tagsInput.split(',').map(tag => tag.trim()) : [];
+                
+                // Show loading state
+                submitButton.disabled = true;
+                submitButton.textContent = 'Adding...';
+                
+                // Call API to create the document
+                API.RAG.createDocument(this.currentProject, {
+                    title: title,
+                    content: content,
+                    tags: tags
+                })
+                .then(response => {
+                    // Close the dialog
+                    closeDialog();
+                    
+                    // Reload documents
+                    this.loadDocuments(this.currentProject);
+                    
+                    // Show success message
+                    alert('Document added successfully!');
+                })
+                .catch(error => {
+                    alert(`Error adding document: ${error.message}`);
+                    submitButton.disabled = false;
+                    submitButton.textContent = 'Add Document';
+                });
+            });
         },
         
         // Show new project dialog
         showNewProjectDialog: function() {
-            // For demo purposes, just show a simple prompt
-            const name = prompt('Enter project name:');
+            // Create a dialog for creating a new project
+            const dialog = document.createElement('div');
+            dialog.className = 'modal-dialog';
+            dialog.innerHTML = `
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>Create New Project</h3>
+                        <button class="close-button">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="newProjectForm">
+                            <div class="form-group">
+                                <label for="projectName">Project Name</label>
+                                <input type="text" id="projectName" class="form-control" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="projectDescription">Description (optional)</label>
+                                <textarea id="projectDescription" class="form-control" rows="3"></textarea>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button id="cancelProjectBtn" class="secondary-btn">Cancel</button>
+                        <button id="createProjectBtn" class="primary-btn">Create Project</button>
+                    </div>
+                </div>
+            `;
             
-            if (name) {
-                // In a real implementation, this would make an API call
-                alert('Project creation is not implemented in this demo. In a real system, this would create a new project with the name: ' + name);
-            }
+            // Add the dialog to the page
+            document.body.appendChild(dialog);
+            
+            // Set up event listeners
+            const closeButton = dialog.querySelector('.close-button');
+            const cancelButton = document.getElementById('cancelProjectBtn');
+            const createButton = document.getElementById('createProjectBtn');
+            
+            const closeDialog = () => {
+                document.body.removeChild(dialog);
+            };
+            
+            closeButton.addEventListener('click', closeDialog);
+            cancelButton.addEventListener('click', closeDialog);
+            
+            createButton.addEventListener('click', () => {
+                const name = document.getElementById('projectName').value.trim();
+                const description = document.getElementById('projectDescription').value.trim();
+                
+                if (!name) {
+                    alert('Please provide a project name');
+                    return;
+                }
+                
+                // Show loading state
+                createButton.disabled = true;
+                createButton.textContent = 'Creating...';
+                
+                // Call API to create the project
+                API.RAG.createProject({
+                    name: name,
+                    description: description
+                })
+                .then(response => {
+                    // Close the dialog
+                    closeDialog();
+                    
+                    // Reload projects
+                    this.loadProjects();
+                    
+                    // Show success message
+                    alert('Project created successfully!');
+                })
+                .catch(error => {
+                    alert(`Error creating project: ${error.message}`);
+                    createButton.disabled = false;
+                    createButton.textContent = 'Create Project';
+                });
+            });
         },
         
         // Handle document search
         handleSearch: function(e) {
             const input = document.getElementById('documentSearch');
-            const query = input ? input.value.toLowerCase() : '';
+            const query = input ? input.value.trim() : '';
             
             if (!this.currentProject) return;
             
@@ -726,18 +1025,26 @@ LLM.Components = {
                 return;
             }
             
-            // For demo purposes, filter the documents client-side
-            // In a real implementation, this would make an API call
-            const documentItems = document.querySelectorAll('.document-item');
+            // Show loading state
+            const documentList = document.getElementById('documentList');
+            if (documentList) {
+                documentList.innerHTML = '<div class="loading-spinner"></div>';
+            }
             
-            documentItems.forEach(item => {
-                const docName = item.querySelector('.document-name').textContent.toLowerCase();
-                if (docName.includes(query)) {
-                    item.style.display = 'block';
-                } else {
-                    item.style.display = 'none';
-                }
-            });
+            // Call the search API
+            API.RAG.searchDocuments(this.currentProject, query)
+                .then(data => {
+                    // Store documents in memory
+                    this.documents = data.data || [];
+                    
+                    // Render the documents
+                    this.renderDocuments(this.documents);
+                })
+                .catch(error => {
+                    if (documentList) {
+                        documentList.innerHTML = `<div class="error-message">Error searching documents: ${error.message}</div>`;
+                    }
+                });
         },
         
         // Load projects from API
@@ -745,14 +1052,35 @@ LLM.Components = {
             const projectList = document.getElementById('projectList');
             if (!projectList) return;
             
-            projectList.innerHTML = '<div class="empty-state">Loading projects...</div>';
+            projectList.innerHTML = '<div class="loading-spinner"></div>';
             
-            // For demo purposes, use mock data instead of actual API call
-            this.getMockProjects()
+            // Call the real API
+            API.RAG.getProjects()
                 .then(data => {
-                    if (data.projects && data.projects.length > 0) {
+                    // Check and log the actual response format
+                    console.log("Project API response:", data);
+                    
+                    // Handle different response formats
+                    let projects = [];
+                    if (data.data) {
+                        // Standard success response format
+                        projects = data.data;
+                        console.log(`Found ${projects.length} projects in data.data`);
+                    } else if (data.projects) {
+                        // Alternative format
+                        projects = data.projects;
+                        console.log(`Found ${projects.length} projects in data.projects`);
+                    } else if (Array.isArray(data)) {
+                        // Direct array format
+                        projects = data;
+                        console.log(`Found ${projects.length} projects in direct array`);
+                    } else {
+                        console.error("Unknown project data format:", data);
+                    }
+                    
+                    if (projects.length > 0) {
                         let html = '<ul class="project-list-items">';
-                        data.projects.forEach(project => {
+                        projects.forEach(project => {
                             html += `<li class="project-item" data-project-id="${project.id}">
                                 <span class="project-name">${project.name}</span>
                                 <span class="document-count">${project.document_count} docs</span>
@@ -777,9 +1105,9 @@ LLM.Components = {
                         });
                         
                         // Select first project by default
-                        if (data.projects.length > 0) {
-                            this.loadDocuments(data.projects[0].id);
-                            this.currentProject = data.projects[0].id;
+                        if (projects.length > 0) {
+                            this.loadDocuments(projects[0].id);
+                            this.currentProject = projects[0].id;
                             document.querySelector('.project-item').classList.add('selected');
                         }
                     } else {
@@ -787,36 +1115,8 @@ LLM.Components = {
                     }
                 })
                 .catch(error => {
-                    projectList.innerHTML = `<div class="empty-state">Error loading projects: ${error.message}</div>`;
+                    projectList.innerHTML = `<div class="error-message">Error loading projects: ${error.message}</div>`;
                 });
-        },
-        
-        // Get mock projects for demo
-        getMockProjects: function() {
-            return new Promise((resolve) => {
-                // Simulate API delay
-                setTimeout(() => {
-                    const projects = [
-                        {
-                            id: 'project1',
-                            name: 'Research Documents',
-                            document_count: 3
-                        },
-                        {
-                            id: 'project2',
-                            name: 'Technical Guides',
-                            document_count: 2
-                        },
-                        {
-                            id: 'project3',
-                            name: 'Meeting Notes',
-                            document_count: 1
-                        }
-                    ];
-                    
-                    resolve({ projects });
-                }, 300);
-            });
         },
         
         // Load documents for a project
@@ -824,118 +1124,94 @@ LLM.Components = {
             const documentList = document.getElementById('documentList');
             if (!documentList) return;
             
-            documentList.innerHTML = '<div class="empty-state">Loading documents...</div>';
+            documentList.innerHTML = '<div class="loading-spinner"></div>';
             
-            // In a real implementation, this would call the actual API
-            // For demo, we'll create some mock documents
-            this.getMockDocuments(projectId)
+            // Call the real API
+            API.RAG.getDocuments(projectId)
                 .then(data => {
-                    if (data.documents && data.documents.length > 0) {
-                        let html = '<ul class="document-list">';
-                        data.documents.forEach(doc => {
-                            html += `<li class="document-item" data-document-id="${doc.id}">
-                                <div class="document-selector">
-                                    <input type="checkbox" class="document-checkbox" id="doc-${doc.id}">
-                                    <label for="doc-${doc.id}" class="document-name">${doc.title}</label>
-                                </div>
-                                <div class="document-actions">
-                                    <button class="preview-btn" data-id="${doc.id}" title="Preview">👁️</button>
-                                </div>
-                            </li>`;
-                        });
-                        html += '</ul>';
-                        documentList.innerHTML = html;
-                        
-                        // Store documents in memory
-                        this.documents = data.documents;
-                        
-                        // Add click handlers for document selection
-                        document.querySelectorAll('.document-checkbox').forEach(checkbox => {
-                            checkbox.addEventListener('change', () => {
-                                const docId = checkbox.closest('.document-item').getAttribute('data-document-id');
-                                if (checkbox.checked) {
-                                    this.selectedDocuments.push(docId);
-                                } else {
-                                    this.selectedDocuments = this.selectedDocuments.filter(id => id !== docId);
-                                }
-                                this.updateTokenCount();
-                            });
-                        });
-                        
-                        // Add preview handlers
-                        document.querySelectorAll('.preview-btn').forEach(btn => {
-                            btn.addEventListener('click', () => {
-                                const docId = btn.getAttribute('data-id');
-                                const doc = this.documents.find(d => d.id === docId);
-                                if (doc) {
-                                    this.showDocumentPreview(doc);
-                                }
-                            });
-                        });
-                        
-                        // Add double-click preview on document names
-                        document.querySelectorAll('.document-name').forEach(nameEl => {
-                            nameEl.addEventListener('dblclick', () => {
-                                const docId = nameEl.closest('.document-item').getAttribute('data-document-id');
-                                const doc = this.documents.find(d => d.id === docId);
-                                if (doc) {
-                                    this.showDocumentPreview(doc);
-                                }
-                            });
-                        });
+                    console.log("Document API response:", data);
+                    
+                    // Handle different response formats
+                    let documents = [];
+                    if (data.data) {
+                        // Standard success response format
+                        documents = data.data;
+                        console.log(`Found ${documents.length} documents in data.data`);
+                    } else if (data.documents) {
+                        // Alternative format
+                        documents = data.documents;
+                        console.log(`Found ${documents.length} documents in data.documents`);
+                    } else if (Array.isArray(data)) {
+                        // Direct array format
+                        documents = data;
+                        console.log(`Found ${documents.length} documents in direct array`);
                     } else {
-                        documentList.innerHTML = '<div class="empty-state">No documents found in this project.</div>';
+                        console.error("Unknown document data format:", data);
                     }
+                    
+                    // Store documents in memory
+                    this.documents = documents;
+                    
+                    // Render the documents
+                    this.renderDocuments(this.documents);
                 })
                 .catch(error => {
-                    documentList.innerHTML = `<div class="empty-state">Error loading documents: ${error.message}</div>`;
+                    documentList.innerHTML = `<div class="error-message">Error loading documents: ${error.message}</div>`;
                 });
         },
         
-        // Get mock documents for demo
-        getMockDocuments: function(projectId) {
-            return new Promise((resolve) => {
-                // Simulate API delay
-                setTimeout(() => {
-                    const documents = [
-                        {
-                            id: 'doc1',
-                            title: 'Getting Started with LLMs',
-                            content: 'Large Language Models (LLMs) are versatile AI systems that can generate and understand text. They are trained on vast amounts of text data, allowing them to learn patterns, relationships, and facts about the world. This document explains how to get started using them effectively.',
-                            tokens: 200,
-                            metadata: {
-                                author: 'AI Research Team',
-                                created: '2023-05-15',
-                                category: 'Guide'
-                            }
-                        },
-                        {
-                            id: 'doc2',
-                            title: 'Understanding Context Windows',
-                            content: 'Context windows determine how much text an LLM can process at once. Models with larger context windows can understand and reference information from more text in a single prompt, making them more useful for tasks that require analyzing long documents or maintaining extended conversations.',
-                            tokens: 150,
-                            metadata: {
-                                author: 'Technical Documentation',
-                                created: '2023-06-22',
-                                category: 'Technical'
-                            }
-                        },
-                        {
-                            id: 'doc3',
-                            title: 'RAG Implementation Guide',
-                            content: 'Retrieval-Augmented Generation (RAG) enhances LLM capabilities by retrieving relevant information from a knowledge base before generating a response. This allows the model to access knowledge beyond its training data and provide more accurate, up-to-date information. This document covers implementation details for a RAG system.',
-                            tokens: 250,
-                            metadata: {
-                                author: 'System Architecture Team',
-                                created: '2023-08-10',
-                                category: 'Technical'
-                            }
+        // Render documents in the UI
+        renderDocuments: function(documents) {
+            const documentList = document.getElementById('documentList');
+            if (!documentList) return;
+            
+            if (documents.length > 0) {
+                let html = '<ul class="document-list">';
+                documents.forEach(doc => {
+                    html += `<li class="document-item" data-document-id="${doc.id}">
+                        <div class="document-selector">
+                            <input type="checkbox" class="document-checkbox" id="doc-${doc.id}">
+                            <label for="doc-${doc.id}" class="document-name">${doc.title}</label>
+                        </div>
+                        <div class="document-actions">
+                            <button class="preview-btn" data-id="${doc.id}" title="Preview">👁️</button>
+                        </div>
+                    </li>`;
+                });
+                html += '</ul>';
+                documentList.innerHTML = html;
+                
+                // Add click handlers for document selection
+                document.querySelectorAll('.document-checkbox').forEach(checkbox => {
+                    checkbox.addEventListener('change', () => {
+                        const docId = checkbox.closest('.document-item').getAttribute('data-document-id');
+                        if (checkbox.checked) {
+                            this.selectedDocuments.push(docId);
+                        } else {
+                            this.selectedDocuments = this.selectedDocuments.filter(id => id !== docId);
                         }
-                    ];
-                    
-                    resolve({ documents });
-                }, 500);
-            });
+                        this.updateTokenCount();
+                    });
+                });
+                
+                // Add preview handlers
+                document.querySelectorAll('.preview-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const docId = btn.getAttribute('data-id');
+                        this.showDocumentPreview(docId);
+                    });
+                });
+                
+                // Add double-click preview on document names
+                document.querySelectorAll('.document-name').forEach(nameEl => {
+                    nameEl.addEventListener('dblclick', () => {
+                        const docId = nameEl.closest('.document-item').getAttribute('data-document-id');
+                        this.showDocumentPreview(docId);
+                    });
+                });
+            } else {
+                documentList.innerHTML = '<div class="empty-state">No documents found in this project.</div>';
+            }
         },
         
         // Update token count for selected documents
@@ -945,21 +1221,27 @@ LLM.Components = {
             const tokenCounter = document.getElementById('tokenCounter');
             if (!tokenCounter) return;
             
-            tokenCounter.innerHTML = 'Calculating tokens...';
+            tokenCounter.innerHTML = '<div class="loading-spinner"></div>';
             
-            // For demo purposes, calculate tokens from local documents
-            // In a real implementation, this would make an API call
-            setTimeout(() => {
-                let totalTokens = 0;
-                this.selectedDocuments.forEach(docId => {
-                    const doc = this.documents.find(d => d.id === docId);
-                    if (doc && doc.tokens) {
-                        totalTokens += doc.tokens;
+            // Call the token estimation API
+            API.RAG.getTokenInfo(this.currentProject, this.selectedDocuments)
+                .then(data => {
+                    const tokenData = data.data || {};
+                    const totalTokens = tokenData.total_tokens || 0;
+                    
+                    // Update the token counter
+                    tokenCounter.innerHTML = `Selected: ${this.selectedDocuments.length} documents, ${totalTokens} tokens`;
+                    
+                    // If token usage is getting high, add a warning class
+                    if (tokenData.is_over_limit) {
+                        tokenCounter.classList.add('token-warning');
+                    } else {
+                        tokenCounter.classList.remove('token-warning');
                     }
+                })
+                .catch(error => {
+                    tokenCounter.innerHTML = `Error calculating tokens: ${error.message}`;
                 });
-                
-                tokenCounter.innerHTML = `Selected: ${this.selectedDocuments.length} documents, ${totalTokens} tokens`;
-            }, 300);
         },
         
         // Get currently selected documents

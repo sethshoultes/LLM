@@ -1,2 +1,3 @@
 #!/bin/bash
-source "$(dirname "$0")/../python/llm_env/bin/activate"
+# Use absolute path to ensure correct activation
+source "/Volumes/LLM/LLM-MODELS/tools/python/llm_env_new/bin/activate"
