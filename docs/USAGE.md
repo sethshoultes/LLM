@@ -10,11 +10,17 @@
 
 ## Command Reference
 
-The main script `llm.sh` accepts various commands:
+The main script `llm.sh` accepts various modes and commands:
 
 ```bash
-./llm.sh [COMMAND]
+./llm.sh [MODE] [COMMAND]
 ```
+
+### Available Modes
+
+| Mode | Description |
+|------|-------------|
+| `rag` | Enable Retrieval Augmented Generation features |
 
 ### Available Commands
 
@@ -25,6 +31,15 @@ The main script `llm.sh` accepts various commands:
 | `download` | Download models from HuggingFace |
 | `samples` | Download sample models for testing |
 | `help` | Show help information |
+
+### Examples
+
+```bash
+./llm.sh                # Standard interface
+./llm.sh quiet          # Quiet interface (recommended)
+./llm.sh rag            # Standard interface with RAG features
+./llm.sh rag quiet      # Quiet interface with RAG features
+```
 
 ### Legacy Commands
 
@@ -119,6 +134,66 @@ For best results:
 | Code Generation | 0.3-0.5 | 0.95 | 1024 | 0.3 |
 | Brainstorming | 0.8-1.2 | 0.98 | 1024 | 0.2 |
 
+## Retrieval Augmented Generation (RAG)
+
+RAG enhances the LLM by allowing it to reference your own documents when generating responses. This feature is particularly useful for answering questions about specific documents, knowledge bases, or domain-specific information.
+
+### Enabling RAG
+
+Start the interface with RAG support:
+
+```bash
+./llm.sh rag
+```
+
+### Project Management
+
+RAG organizes documents into projects (collections of related documents):
+
+1. **Create a Project**: Click "New Project" in the sidebar
+2. **Name Your Project**: Give it a name and optional description
+3. **Select a Project**: Use the dropdown to switch between projects
+
+### Document Management
+
+Within each project, you can manage documents:
+
+1. **Add Document**: Click "Add Document" in the sidebar
+2. **Create Documents**: Add title, content (markdown supported), and optional tags
+3. **View Documents**: Click on a document in the list to view its contents
+4. **Search**: Use the search box to filter documents by title or content
+
+### Using Documents as Context
+
+Two ways to use documents as context:
+
+1. **Manual Selection**:
+   - Open a document by clicking on it
+   - Click "Use as Context" to add it to your current context
+   - Selected documents appear in the context bar above the chat
+   - Documents selected as context are highlighted in the list
+
+2. **Auto-suggestion** (toggle in the context bar):
+   - System automatically suggests relevant documents based on your messages
+   - Suggestions are added to your context before generating a response
+
+When the model uses context from your documents, it will reference the source documents at the end of the response, making it clear which information was retrieved from your documents.
+
+### Document Features
+
+- **Markdown Support**: Documents support markdown formatting for better organization
+- **Tagging**: Add tags to documents for easier organization and retrieval
+- **Search**: Find documents by content, title, or tags
+- **Collections**: Organize related documents into projects
+
+### Tips for Using RAG Effectively
+
+1. **Organize Documents**: Create separate projects for different domains
+2. **Keep Documents Focused**: Shorter, more specific documents work better than very long ones
+3. **Use Clear Titles**: Helps with finding documents later
+4. **Add Tags**: Makes filtering and searching easier
+5. **Be Specific**: When asking questions, be specific to get the most relevant context
+
 ## Troubleshooting
 
 ### Interface Won't Start
@@ -146,3 +221,11 @@ For best results:
 - Check that the models are in the correct location
 - Run `./llm.sh samples` to download a test model
 - Verify that the path structure matches what the system expects
+
+### RAG Specific Issues
+
+- **Missing RAG Features**: Ensure you're starting with `./llm.sh rag`
+- **Module Import Errors**: Check console output for Python import errors
+- **Empty Projects List**: Create your first project using the "New Project" button
+- **Documents Not Showing Up**: Verify you're in the correct project
+- **Context Not Working**: Make sure documents are properly selected for context

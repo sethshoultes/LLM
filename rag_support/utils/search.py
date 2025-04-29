@@ -10,8 +10,17 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
 from collections import Counter
 
-# Base directory - use absolute path
-BASE_DIR = Path("/Volumes/LLM")
+# Import BASE_DIR from rag_support
+try:
+    from rag_support import BASE_DIR
+except ImportError:
+    # Fallback if the import fails
+    import os
+    SCRIPT_DIR = Path(__file__).resolve().parent
+    BASE_DIR = SCRIPT_DIR.parent.parent
+    # Use environment variable if available
+    BASE_DIR = Path(os.environ.get("LLM_BASE_DIR", str(BASE_DIR)))
+
 PROJECTS_DIR = BASE_DIR / "rag_support" / "projects"
 
 class SimpleSearch:

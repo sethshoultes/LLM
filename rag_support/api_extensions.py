@@ -1,16 +1,25 @@
 #!/usr/bin/env python3
 # api_extensions.py - Extensions to the quiet_interface.py API for RAG support
 
+import os
 import json
 import urllib.parse
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Union, Tuple
 
+# Import BASE_DIR from rag_support
+try:
+    from rag_support import BASE_DIR
+except ImportError:
+    # Fallback if the import fails
+    import os
+    SCRIPT_DIR = Path(__file__).resolve().parent
+    BASE_DIR = SCRIPT_DIR.parent
+    # Use environment variable if available
+    BASE_DIR = Path(os.environ.get("LLM_BASE_DIR", str(BASE_DIR)))
+
 # Import RAG utilities
 from rag_support.utils import project_manager, search_engine
-
-# Base directory - use absolute path
-BASE_DIR = Path("/Volumes/LLM")
 
 class RagApiHandler:
     """Handles RAG-related API requests for the quiet_interface"""

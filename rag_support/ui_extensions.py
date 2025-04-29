@@ -1,10 +1,19 @@
 #!/usr/bin/env python3
 # ui_extensions.py - Extensions to the quiet_interface.py UI for RAG support
 
+import os
 from pathlib import Path
 
-# Base directory - use absolute path
-BASE_DIR = Path("/Volumes/LLM")
+# Import BASE_DIR from rag_support
+try:
+    from rag_support import BASE_DIR
+except ImportError:
+    # Fallback if the import fails
+    import os
+    SCRIPT_DIR = Path(__file__).resolve().parent
+    BASE_DIR = SCRIPT_DIR.parent
+    # Use environment variable if available
+    BASE_DIR = Path(os.environ.get("LLM_BASE_DIR", str(BASE_DIR)))
 
 # CSS styles to add to the existing UI
 RAG_CSS = """
@@ -1145,6 +1154,22 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 """
 
+# Function to get extension point content
+def get_rag_ui_extensions():
+    """Get the RAG UI extensions for each extension point
+    
+    Returns a dictionary with extension point names as keys and content as values
+    """
+    extensions = {
+        "HEAD": f'<style>{RAG_CSS}</style>',
+        "SIDEBAR": RAG_SIDEBAR_HTML,
+        "MAIN_CONTROLS": RAG_CONTEXT_BAR_HTML,
+        "DIALOGS": RAG_DIALOGS_HTML,
+        "SCRIPTS": f'<script>{RAG_JAVASCRIPT}</script>'
+    }
+    
+    return extensions
+
 # Function to get HTML with RAG extensions
 def get_extended_html_template():
     """Get the HTML template with RAG extensions
@@ -1157,12 +1182,12 @@ def get_extended_html_template():
     # Load original template
     html = HTML_TEMPLATE
     
-    # Insert RAG CSS in the head
-    head_end = '</head>'
-    html = html.replace(head_end, f'<style>{RAG_CSS}</style>\n{head_end}')
+    # Get extensions
+    extensions = get_rag_ui_extensions()
     
-    # Add RAG Javascript before the closing body tag
-    body_end = '</body>'
-    html = html.replace(body_end, f'<script>{RAG_JAVASCRIPT}</script>\n{body_end}')
+    # Apply extensions to template
+    for point, content in extensions.items():
+        marker = f'<!-- EXTENSION_POINT: {point} -->'
+        html = html.replace(marker, f'{marker}\n{content}')
     
     return html

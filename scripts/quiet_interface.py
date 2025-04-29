@@ -12,6 +12,7 @@ import threading
 import webbrowser
 import time
 import logging
+import traceback
 
 # Disable debug logs
 os.environ["LLAMA_CPP_VERBOSE"] = "0"  # Suppress llama.cpp debug logs
@@ -21,8 +22,14 @@ logging.basicConfig(level=logging.ERROR)  # Only show error messages
 START_PORT = 5100
 END_PORT = 5110
 
-# Directory info
-BASE_DIR = Path("/Volumes/LLM")
+# Get base directory from environment or use script location
+SCRIPT_DIR = Path(__file__).resolve().parent
+BASE_DIR = SCRIPT_DIR.parent
+# Use environment variable if available
+BASE_DIR = Path(os.environ.get("LLM_BASE_DIR", str(BASE_DIR)))
+
+# Check if RAG is enabled
+RAG_ENABLED = os.environ.get("LLM_RAG_ENABLED") == "1"
 
 # HTML template for the main page
 HTML_TEMPLATE = """
@@ -32,6 +39,7 @@ HTML_TEMPLATE = """
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LLM Interface</title>
+    <!-- EXTENSION_POINT: HEAD -->
     <style>
         body {
             font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -218,12 +226,14 @@ HTML_TEMPLATE = """
     </style>
 </head>
 <body>
+    <!-- EXTENSION_POINT: HEADER_NAV -->
     <h1>Portable LLM Interface</h1>
     
     <div class="card">
         <h2>Available Models</h2>
         <div id="modelList" class="model-list">Loading models...</div>
     </div>
+    <!-- EXTENSION_POINT: SIDEBAR -->
     
     <div class="card">
         <h2>Model Selection</h2>
@@ -235,6 +245,7 @@ HTML_TEMPLATE = """
     
     <div class="card">
         <h2>Chat</h2>
+        <!-- EXTENSION_POINT: MAIN_CONTROLS -->
         <div id="chatHistory" class="chat-history"></div>
         
         <div class="message-input">
@@ -246,6 +257,7 @@ HTML_TEMPLATE = """
         <div class="chat-controls">
             <button id="newChatBtn" class="secondary-btn">New Chat</button>
             <button id="exportChatBtn" class="secondary-btn">Export Chat</button>
+            <!-- EXTENSION_POINT: CHAT_CONTROLS -->
         </div>
         
         <div class="parameter-controls">
@@ -274,6 +286,7 @@ HTML_TEMPLATE = """
         
         <div id="stats" class="stats" style="display: none;"></div>
     </div>
+    <!-- EXTENSION_POINT: DIALOGS -->
     
     <script>
         // Initialize chat history
@@ -536,6 +549,7 @@ HTML_TEMPLATE = """
             URL.revokeObjectURL(url);
         });
     </script>
+    <!-- EXTENSION_POINT: SCRIPTS -->
 </body>
 </html>
 """
@@ -602,11 +616,63 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
         """Handle GET requests"""
         parsed_path = urllib.parse.urlparse(self.path)
         
+        # Handle RAG API requests if enabled
+        if RAG_ENABLED and parsed_path.path.startswith('/api/projects'):
+            try:
+                # Import the RAG API handler
+                from rag_support.api_extensions import api_handler
+                
+                # Parse query parameters
+                query_params = {}
+                if parsed_path.query:
+                    query_params = {k: v[0] for k, v in urllib.parse.parse_qs(parsed_path.query).items()}
+                
+                # Handle the request
+                status_code, response_data = api_handler.handle_request(
+                    parsed_path.path, 
+                    'GET', 
+                    query_params=query_params
+                )
+                
+                self.send_response(status_code)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps(response_data).encode('utf-8'))
+                return
+            except ImportError as e:
+                self.send_error(500, f"Error loading RAG modules: {str(e)}")
+                traceback.print_exc()
+                return
+            except Exception as e:
+                self.send_error(500, f"Error handling RAG API request: {str(e)}")
+                traceback.print_exc()
+                return
+        
+        # Standard request handling
         if parsed_path.path == '/' or parsed_path.path == '/index.html':
             self.send_response(200)
             self.send_header('Content-type', 'text/html')
             self.end_headers()
-            self.wfile.write(HTML_TEMPLATE.encode('utf-8'))
+            
+            # If RAG is enabled, use the extended template
+            html_template = HTML_TEMPLATE
+            if RAG_ENABLED:
+                try:
+                    from rag_support.ui_extensions import get_extended_html_template
+                    html_template = get_extended_html_template()
+                    print("RAG UI extensions loaded")
+                except ImportError as e:
+                    print(f"Error loading RAG UI extensions: {e}")
+                    traceback.print_exc()
+                except Exception as e:
+                    print(f"Unexpected error loading RAG UI: {e}")
+                    traceback.print_exc()
+            
+            # If RAG is enabled, add data attribute to body tag
+            if RAG_ENABLED:
+                html_template = html_template.replace("<body>", "<body data-rag-enabled=\"true\">")
+            
+            self.wfile.write(html_template.encode('utf-8'))
         elif parsed_path.path == '/api/models':
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
@@ -619,7 +685,42 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
     
     def do_POST(self):
         """Handle POST requests"""
-        if self.path == '/api/chat':
+        parsed_path = urllib.parse.urlparse(self.path)
+        
+        # Handle RAG API requests if enabled
+        if RAG_ENABLED and parsed_path.path.startswith('/api/projects'):
+            try:
+                # Import the RAG API handler
+                from rag_support.api_extensions import api_handler
+                
+                # Read POST data
+                content_length = int(self.headers['Content-Length'])
+                post_data = self.rfile.read(content_length)
+                request_data = json.loads(post_data.decode('utf-8'))
+                
+                # Handle the request
+                status_code, response_data = api_handler.handle_request(
+                    parsed_path.path, 
+                    'POST', 
+                    body=request_data
+                )
+                
+                self.send_response(status_code)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps(response_data).encode('utf-8'))
+                return
+            except ImportError as e:
+                self.send_error(500, f"Error loading RAG modules: {str(e)}")
+                traceback.print_exc()
+                return
+            except Exception as e:
+                self.send_error(500, f"Error handling RAG API request: {str(e)}")
+                traceback.print_exc()
+                return
+        
+        # Standard chat API handling
+        if parsed_path.path == '/api/chat':
             content_length = int(self.headers['Content-Length'])
             post_data = self.rfile.read(content_length)
             request_data = json.loads(post_data.decode('utf-8'))
@@ -633,6 +734,53 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
             frequency_penalty = request_data.get('frequency_penalty', 0.0)
             presence_penalty = request_data.get('presence_penalty', 0.0)
             message_history = request_data.get('history', [])
+            
+            # Check for RAG context
+            context_docs = request_data.get('context_docs', [])
+            context_content = ""
+            
+            # If we have context docs and RAG is enabled, load the document content
+            if RAG_ENABLED and context_docs:
+                try:
+                    from rag_support.utils import project_manager
+                    
+                    # Find the project ID from the context docs or headers
+                    project_id = request_data.get('project_id')
+                    
+                    # If we don't have a project ID, try to get it from referer
+                    if not project_id:
+                        referer = self.headers.get('Referer', '')
+                        referer_parts = urllib.parse.urlparse(referer).path.split('/')
+                        for i, part in enumerate(referer_parts):
+                            if part == 'projects' and i + 1 < len(referer_parts):
+                                project_id = referer_parts[i + 1]
+                                break
+                    
+                    # If we still don't have a project ID, use the first available project
+                    if not project_id:
+                        projects = project_manager.get_projects()
+                        if projects:
+                            project_id = projects[0]['id']
+                    
+                    # Load documents if we have a project ID
+                    if project_id:
+                        for doc_id in context_docs:
+                            doc = project_manager.get_document(project_id, doc_id)
+                            if doc:
+                                context_content += f"## {doc.get('title', 'Document')}\n\n"
+                                context_content += doc.get('content', '') + "\n\n"
+                        
+                        # Add context to system message
+                        if context_content:
+                            if system_message:
+                                system_message += "\n\n"
+                            system_message += "Use the following information to answer the user's question:\n\n" + context_content
+                except ImportError as e:
+                    print(f"Error loading context: {e}")
+                    traceback.print_exc()
+                except Exception as e:
+                    print(f"Error processing context: {e}")
+                    traceback.print_exc()
             
             # Try to use the inference module
             try:
@@ -685,6 +833,11 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                         "time_taken": result.get('time_taken', 'N/A'),
                         "tokens_generated": result.get('tokens_generated', 'N/A')
                     }
+                    
+                    # Add context info if RAG was used
+                    if context_docs:
+                        response["context_used"] = True
+                        response["context_count"] = len(context_docs)
                 
             except ImportError:
                 # Fall back to the placeholder response
@@ -712,7 +865,30 @@ def open_browser(port):
     webbrowser.open(f'http://localhost:{port}')
 
 if __name__ == '__main__':
-    print(f"Starting quiet LLM interface...")
+    print(f"Starting LLM interface...")
+    
+    # Show RAG status
+    if RAG_ENABLED:
+        print(f"RAG features are enabled.")
+        
+        # Verify RAG support is accessible
+        try:
+            # Import and initialize RAG modules
+            import rag_support
+            from rag_support.utils import project_manager
+            print(f"RAG support modules loaded successfully")
+            
+            # Initialize directories
+            rag_support.init_directories()
+            print(f"RAG directories initialized at {rag_support.BASE_DIR}")
+        except ImportError as e:
+            print(f"Warning: Error importing RAG modules: {e}")
+            print(f"RAG features may not work correctly.")
+            traceback.print_exc()
+        except Exception as e:
+            print(f"Warning: Error initializing RAG: {e}")
+            print(f"RAG features may not work correctly.")
+            traceback.print_exc()
     
     # Try to find an available port
     for port in range(START_PORT, END_PORT + 1):
