@@ -52,3 +52,6 @@ _PERSONAL/
 
 # Logs
 *.log
+
+# Environment variables
+.env

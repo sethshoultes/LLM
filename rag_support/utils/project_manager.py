@@ -10,8 +10,17 @@ from pathlib import Path
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 
-# Base directory - use absolute path
-BASE_DIR = Path("/Volumes/LLM")
+# Import BASE_DIR from rag_support
+try:
+    from rag_support import BASE_DIR
+except ImportError:
+    # Fallback if the import fails
+    import os
+    SCRIPT_DIR = Path(__file__).resolve().parent
+    BASE_DIR = SCRIPT_DIR.parent.parent
+    # Use environment variable if available
+    BASE_DIR = Path(os.environ.get("LLM_BASE_DIR", str(BASE_DIR)))
+
 PROJECTS_DIR = BASE_DIR / "rag_support" / "projects"
 
 class ProjectManager:
@@ -66,32 +75,59 @@ class ProjectManager:
         if not force_refresh and self.projects_cache is not None and current_time - self.last_cache_update < 30:
             return self.projects_cache
         
+        # Debug logging
+        print(f"Loading projects from {self.projects_dir}")
+        
         projects = []
         
-        # Scan projects directory
-        for project_dir in self.projects_dir.glob("*"):
-            if project_dir.is_dir() and (project_dir / "project.json").exists():
-                try:
-                    with open(project_dir / "project.json", "r") as f:
-                        project_data = json.load(f)
+        # Scan projects directory with improved error handling
+        try:
+            # First, check if directory exists
+            if not self.projects_dir.exists():
+                print(f"Projects directory does not exist: {self.projects_dir}")
+                self.projects_dir.mkdir(exist_ok=True, parents=True)
+                return []
+                
+            # Get all directories excluding hidden ones (those starting with .)
+            project_dirs = [d for d in self.projects_dir.glob("*") if d.is_dir() and not d.name.startswith('.')]
+            print(f"Found {len(project_dirs)} potential project directories")
+            
+            for project_dir in project_dirs:
+                project_file = project_dir / "project.json"
+                print(f"Checking project file: {project_file}")
+                
+                if project_file.exists():
+                    try:
+                        with open(project_file, "r") as f:
+                            project_data = json.load(f)
+                            
+                        print(f"Loaded project: {project_data.get('name', 'Unknown')}")
+                            
+                        # Count items to ensure accurate numbers
+                        if "document_count" not in project_data or "recalculate_counts" in project_data:
+                            document_count = len(list((project_dir / "documents").glob("*.md")))
+                            artifact_count = len(list((project_dir / "artifacts").glob("*")))
+                            chat_count = len(list((project_dir / "chats").glob("*.json")))
+                            
+                            project_data["document_count"] = document_count
+                            project_data["artifact_count"] = artifact_count 
+                            project_data["chat_count"] = chat_count
+                            
+                            # Update the project.json with correct counts
+                            with open(project_file, "w") as f:
+                                json.dump(project_data, f, indent=2)
                         
-                    # Count items to ensure accurate numbers
-                    if "document_count" not in project_data or "recalculate_counts" in project_data:
-                        document_count = len(list((project_dir / "documents").glob("*.md")))
-                        artifact_count = len(list((project_dir / "artifacts").glob("*")))
-                        chat_count = len(list((project_dir / "chats").glob("*.json")))
-                        
-                        project_data["document_count"] = document_count
-                        project_data["artifact_count"] = artifact_count 
-                        project_data["chat_count"] = chat_count
-                        
-                        # Update the project.json with correct counts
-                        with open(project_dir / "project.json", "w") as f:
-                            json.dump(project_data, f, indent=2)
-                    
-                    projects.append(project_data)
-                except Exception as e:
-                    print(f"Error reading project {project_dir.name}: {e}")
+                        projects.append(project_data)
+                    except Exception as e:
+                        print(f"Error reading project {project_dir.name}: {e}")
+                        import traceback
+                        traceback.print_exc()
+                else:
+                    print(f"Project file does not exist: {project_file}")
+        except Exception as e:
+            print(f"Error scanning projects directory: {e}")
+            import traceback
+            traceback.print_exc()
         
         # Sort by updated_at (most recent first)
         projects.sort(key=lambda p: p.get("updated_at", ""), reverse=True)
@@ -211,6 +247,10 @@ class ProjectManager:
         project_dir = self.projects_dir / project_id
         doc_path = project_dir / "documents" / f"{doc_id}.md"
         
+        # Skip macOS hidden files
+        if doc_id.startswith(".") or doc_id.startswith("._"):
+            return None
+            
         if not doc_path.exists():
             return None
         
@@ -263,6 +303,10 @@ class ProjectManager:
         
         documents = []
         for doc_path in documents_dir.glob("*.md"):
+            # Skip hidden files (macOS ._ files)
+            if doc_path.name.startswith(".") or doc_path.name.startswith("._"):
+                continue
+                
             try:
                 doc_id = doc_path.stem
                 document = self.get_document(project_id, doc_id)

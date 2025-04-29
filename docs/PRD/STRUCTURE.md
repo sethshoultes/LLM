@@ -57,7 +57,7 @@ The following directories and files are actively used in the current system:
       │   ├── activate_mac.sh     # Mac environment activation - CRITICAL
       │   └── activate_pi.sh      # Pi environment activation - CRITICAL
       └── python/                 # Python environment and modules
-          └── llm_env/            # Python virtual environment - ACTIVELY USED
+          └── llm_env_new/        # Python virtual environment - ACTIVELY USED
 ```
 
 ### Documentation (`/docs`)
@@ -94,7 +94,7 @@ The following directories and files are actively used in the current system:
 ## Important Notes on Structure
 
 1. **Virtual Environment Location**:
-   The Python virtual environment is located at `/Volumes/LLM/LLM-MODELS/tools/python/llm_env/`
+   The Python virtual environment is located at `/Volumes/LLM/LLM-MODELS/tools/python/llm_env_new/`
    This contains all Python dependencies (llama-cpp-python, transformers, etc.)
 
 2. **Primary Script Location**:

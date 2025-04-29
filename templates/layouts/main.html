@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLM Interface</title>
+    <!-- CSS -->
+    {% block styles %}
+    <style>
+        {% include "assets/css/main.css" %}
+    </style>
+    {% endblock %}
+    
+    <!-- Extension point for HEAD -->
+    {% block head_extensions %}{% endblock %}
+</head>
+<body {% if rag_enabled %}data-rag-enabled="true"{% endif %}>
+    <!-- Extension point for HEADER_NAV -->
+    {% block header_nav %}{% endblock %}
+    
+    <h1>Portable LLM Interface</h1>
+    
+    <div class="interface-container">
+        <!-- Sidebar - only rendered if RAG is enabled -->
+        {% if rag_enabled %}
+            {% include "components/sidebar.html" %}
+        {% endif %}
+        
+        <div class="main-content">
+            <!-- Models card -->
+            <div class="card">
+                <h2>Available Models</h2>
+                <div id="modelList" class="model-list">Loading models...</div>
+            </div>
+            
+            <!-- Extension point for SIDEBAR -->
+            {% block sidebar_extensions %}{% endblock %}
+            
+            <!-- Model selection card -->
+            <div class="card">
+                <h2>Model Selection</h2>
+                {% include "components/model_selector.html" %}
+            </div>
+            
+            <!-- Chat card -->
+            <div class="card">
+                <h2>Chat</h2>
+                
+                <!-- Extension point for MAIN_CONTROLS -->
+                {% block main_controls %}{% endblock %}
+                
+                {% if rag_enabled %}
+                {% include "components/context_bar.html" %}
+                {% endif %}
+                
+                {% include "components/chat_interface.html" %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Extension point for DIALOGS -->
+    {% block dialogs %}{% endblock %}
+    
+    <!-- JavaScript -->
+    {% block scripts %}
+    <!-- First load the API client -->
+    <script>
+        {% include "assets/js/api.js" %}
+    </script>
+    
+    <!-- Then load component controllers -->
+    <script>
+        {% include "assets/js/components.js" %}
+    </script>
+    
+    <!-- Finally load the legacy compatibility script -->
+    <script>
+        {% include "assets/js/main.js" %}
+    </script>
+    
+    <!-- Initialization script -->
+    <script>
+    // Simple component initialization wrapper
+    (function() {
+        // Wait until DOM is fully loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log("Initializing components");
+            
+            // Only initialize if namespace exists
+            if (typeof window.LLM === 'undefined' || typeof window.LLM.Components === 'undefined') {
+                console.error("LLM components not found - initialization skipped");
+                return;
+            }
+            
+            try {
+                // Initialize model selector
+                if (window.LLM.Components.ModelSelector) {
+                    window.LLM.Components.ModelSelector.init();
+                }
+                
+                // Initialize chat interface
+                if (window.LLM.Components.ChatInterface) {
+                    window.LLM.Components.ChatInterface.init();
+                }
+                
+                // Initialize parameter controls
+                if (window.LLM.Components.ParameterControls) {
+                    window.LLM.Components.ParameterControls.init();
+                }
+                
+                // Initialize context manager
+                if (window.LLM.Components.ContextManager) {
+                    window.LLM.Components.ContextManager.init();
+                }
+                
+                // Initialize RAG sidebar if enabled
+                if (document.body.getAttribute('data-rag-enabled') && window.LLM.Components.RAGSidebar) {
+                    window.LLM.Components.RAGSidebar.init();
+                }
+                
+                console.log("Components initialized successfully");
+            } catch (error) {
+                console.error("Error during component initialization:", error);
+            }
+        });
+    })();
+    </script>
+    {% endblock %}
+    
+    <!-- Extension point for SCRIPTS -->
+    {% block script_extensions %}{% endblock %}
+</body>
+</html>
