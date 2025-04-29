@@ -9,6 +9,7 @@ This document outlines the plan to address critical issues in our RAG system imp
 - **Cross-Platform**: Ensure system works across platforms
 - **Preserve Core Files**: Maintain `llm.sh` as the central entry point
 - **Lightweight**: Maintain minimal system footprint
+- **Cohesive Integration**: All modes work together as a unified whole
 
 ## Critical Issues to Address
 
@@ -40,24 +41,16 @@ if [ "$1" == "rag" ]; then
     export LLM_RAG_ENABLED=1
     shift  # Remove the rag argument
 fi
-
-# Later in the script, when running quiet_interface.py
-if [ "$LLM_RAG_ENABLED" == "1" ]; then
-    # Pass appropriate flag to the Python script
-    PYTHON_ARGS="--rag"
-fi
 ```
-- Allow `quiet_interface.py` to detect and enable RAG features:
+- Use environment variables directly in Python instead of command-line arguments:
 ```python
-# In quiet_interface.py
-import argparse
-parser = argparse.ArgumentParser()
-parser.add_argument('--rag', action='store_true', help='Enable RAG features')
-args = parser.parse_args()
+# In quiet_interface.py - Simpler than argument parsing
+import os
+RAG_ENABLED = os.environ.get("LLM_RAG_ENABLED") == "1"
 
-# Later in the script
-if args.rag:
-    # Import RAG extensions and enable features
+# Later in the code
+if RAG_ENABLED:
+    # Load and enable RAG features
 ```
 
 ### 3. Hardcoded Paths
@@ -92,11 +85,14 @@ try:
     # Operation
 except (FileNotFoundError, PermissionError) as e:
     print(f"Error: {str(e)}")
-    # Log error and return meaningful message
+    # Log error with detailed information
+    sys.exit(1)  # Exit with error code for visibility
 except Exception as e:
     print(f"Unexpected error: {str(e)}")
-    # Log general error
+    # Log general error with traceback
+    sys.exit(1)  # Exit with error code for visibility
 ```
+- No silent failures or fallbacks - errors should be visible and require fixes
 
 ## System Integration Approach
 
@@ -105,7 +101,7 @@ except Exception as e:
 |------|--------|--------|
 | `llm.sh` | Modify to add RAG mode option | Central entry point for all features |
 | `llm_rag.sh` | Remove after integrating with llm.sh | Eliminate duplication |
-| `quiet_interface.py` | Add RAG integration option | Single interface file with toggleable RAG |
+| `quiet_interface.py` | Add RAG integration option | Single interface file with integrated RAG |
 | `quiet_interface_rag.py` | Merge functionality into quiet_interface.py | Eliminate duplication |
 | `rag_support/__init__.py` | Fix to properly initialize as Python module | Resolve import errors |
 
@@ -134,8 +130,8 @@ except Exception as e:
 
 ### Phase 3: Enhance Error Handling
 1. Add improved error handling to critical operations
-2. Implement context size management
-3. Ensure informative error messages are displayed to users
+2. Ensure informative error messages are displayed to users
+3. Remove any silent failures that mask underlying issues
 
 ## Detailed File Changes
 
@@ -154,31 +150,34 @@ export LLM_RAG_ENABLED="$RAG_ENABLED"
 export PYTHONPATH="$DIR:$PYTHONPATH"
 
 # Modify the Python call
-python "$DIR/scripts/quiet_interface.py" $@ $([ "$RAG_ENABLED" == "1" ] && echo "--rag")
+python "$DIR/scripts/quiet_interface.py" $@
 ```
 
 ### quiet_interface.py
 ```python
-# Add near the top
-import argparse
-parser = argparse.ArgumentParser(description='LLM Interface')
-parser.add_argument('--rag', action='store_true', help='Enable RAG features')
-args = parser.parse_args()
+# Add near the top, after imports
+import os
+from pathlib import Path
+
+# Get base directory from environment or script location
+SCRIPT_DIR = Path(__file__).resolve().parent
+BASE_DIR = Path(os.environ.get("LLM_BASE_DIR", str(SCRIPT_DIR.parent)))
+RAG_ENABLED = os.environ.get("LLM_RAG_ENABLED") == "1"
 
 # At appropriate point in script
-if args.rag:
+if RAG_ENABLED:
     try:
+        # Import RAG modules using fully qualified paths
         from rag_support.api_extensions import api_handler
         from rag_support.ui_extensions import get_extended_html_template
-        # Enable RAG features
+        
+        # Set up RAG features
         HTML_TEMPLATE = get_extended_html_template()
-        RAG_ENABLED = True
+        print("RAG features enabled")
     except ImportError as e:
         print(f"Error loading RAG modules: {e}")
-        print("Falling back to standard mode")
-        RAG_ENABLED = False
-else:
-    RAG_ENABLED = False
+        print("This is a critical error that must be fixed.")
+        sys.exit(1)  # Exit with error code
 ```
 
 ### RequestHandler class in quiet_interface.py
@@ -192,21 +191,68 @@ def do_GET(self):
         if parsed_path.query:
             query_params = {k: v[0] for k, v in urllib.parse.parse_qs(parsed_path.query).items()}
         
-        status_code, response_data = api_handler.handle_request(
-            parsed_path.path, 
-            'GET', 
-            query_params=query_params
-        )
-        
-        self.send_response(status_code)
-        self.send_header('Content-type', 'application/json')
-        self.end_headers()
-        self.wfile.write(json.dumps(response_data).encode('utf-8'))
-        return
+        try:
+            status_code, response_data = api_handler.handle_request(
+                parsed_path.path, 
+                'GET', 
+                query_params=query_params
+            )
+            
+            self.send_response(status_code)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps(response_data).encode('utf-8'))
+            return
+        except Exception as e:
+            print(f"Error handling RAG API request: {e}")
+            self.send_error(500, f"Internal server error: {str(e)}")
+            return
     
     # Continue with standard handling
     # Original code here
 ```
+
+## Verification and Testing
+
+### 1. Basic Verification Steps
+After implementation, verify the system with these checks:
+
+1. Check standard mode works:
+```bash
+./llm.sh
+# Verify interface loads and operates normally
+```
+
+2. Check RAG mode works:
+```bash
+./llm.sh rag
+# Verify RAG features appear and function correctly
+```
+
+3. Verify error handling:
+```bash
+# Temporarily rename rag_support folder to break imports
+mv rag_support rag_support_test
+./llm.sh rag
+# Should show clear error message about missing modules
+mv rag_support_test rag_support
+```
+
+4. Check path handling:
+```bash
+# Run from different directory
+cd /some/other/path
+/path/to/llm.sh rag
+# Should still work correctly with right paths
+```
+
+### 2. Integration Testing
+Test these scenarios to verify cohesive integration:
+
+1. Create a project and documents in RAG mode
+2. Generate responses using RAG context
+3. Switch back to standard mode and verify no errors
+4. Switch to RAG mode again and verify projects remain accessible
 
 ## Compatibility Requirements
 - All changes must maintain backward compatibility
