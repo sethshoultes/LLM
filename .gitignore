@@ -52,3 +52,10 @@ _PERSONAL/
 
 # Logs
 *.log
+
+# Environment variables
+.env
+
+# User-generated projects and data
+rag_support/projects/**/
+!rag_support/projects/__init__.py
