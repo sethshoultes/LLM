@@ -1,0 +1,337 @@
+<div class="context-bar" id="contextBar" style="display: none;">
+    <div class="context-header">
+        <h3>Context Documents</h3>
+        <div class="context-controls">
+            <button class="secondary-btn clear-context-btn" id="clearContextBtn">Clear All</button>
+            <div class="toggle-switch">
+                <label for="autoContextToggle">Auto-suggest:</label>
+                <label class="switch">
+                    <input type="checkbox" id="autoContextToggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+    </div>
+    
+    <div class="context-items" id="contextItems"></div>
+    
+    <div class="context-stats" id="contextStats">
+        <div class="token-usage">
+            <div class="token-bar">
+                <div class="token-used" id="tokenUsed" style="width: 0%"></div>
+            </div>
+            <div class="token-label">
+                <span id="tokenCount">0</span>/<span id="tokenLimit">2048</span> tokens
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.context-bar {
+    background: #f5f7fa;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border: 1px solid #e1e4e8;
+}
+
+.context-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.context-header h3 {
+    margin: 0;
+    font-size: 1rem;
+}
+
+.context-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+}
+
+.clear-context-btn {
+    padding: 0.3rem 0.6rem;
+    font-size: 0.8rem;
+}
+
+.context-items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    min-height: 30px;
+}
+
+.context-item {
+    background: #e6f7ff;
+    border-radius: 6px;
+    padding: 0.3rem 0.5rem;
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    border: 1px solid #91d5ff;
+}
+
+.context-item-title {
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.context-item-remove {
+    cursor: pointer;
+    color: #999;
+    font-size: 1rem;
+}
+
+.context-item-remove:hover {
+    color: #666;
+}
+
+.context-stats {
+    margin-top: 0.8rem;
+    font-size: 0.75rem;
+    color: #666;
+}
+
+.token-usage {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.token-bar {
+    height: 6px;
+    background: #f0f0f0;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.token-used {
+    height: 100%;
+    background: #1890ff;
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+.token-label {
+    display: flex;
+    justify-content: flex-end;
+}
+
+/* Token usage colors */
+.token-low {
+    background: #52c41a;
+}
+
+.token-medium {
+    background: #faad14;
+}
+
+.token-high {
+    background: #f5222d;
+}
+
+/* Toggle switch styling */
+.toggle-switch {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.toggle-switch label {
+    font-size: 0.8rem;
+    color: #666;
+}
+
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 30px;
+    height: 16px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: .2s;
+    border-radius: 16px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 12px;
+    width: 12px;
+    left: 2px;
+    bottom: 2px;
+    background-color: white;
+    transition: .2s;
+    border-radius: 50%;
+}
+
+input:checked + .slider {
+    background-color: #1890ff;
+}
+
+input:checked + .slider:before {
+    transform: translateX(14px);
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Ensure we only run this on pages with the context bar
+    const contextBar = document.getElementById('contextBar');
+    if (!contextBar) return;
+    
+    // Initialize context management
+    const ragContext = {
+        documents: [],
+        maxTokens: 2048,
+        currentTokens: 0,
+        autoSuggest: false
+    };
+    
+    // Setup event listeners
+    const clearContextBtn = document.getElementById('clearContextBtn');
+    const autoContextToggle = document.getElementById('autoContextToggle');
+    
+    if (clearContextBtn) {
+        clearContextBtn.addEventListener('click', clearContext);
+    }
+    
+    if (autoContextToggle) {
+        autoContextToggle.addEventListener('change', function(e) {
+            ragContext.autoSuggest = e.target.checked;
+        });
+    }
+    
+    // Function to add document to context
+    window.addToContext = function(doc) {
+        // Check if document is already in context
+        if (ragContext.documents.some(d => d.id === doc.id)) {
+            return;
+        }
+        
+        // Add document to context
+        ragContext.documents.push(doc);
+        
+        // Update token count
+        ragContext.currentTokens += doc.tokens || 0;
+        
+        // Update UI
+        updateContextUI();
+        
+        // Show context bar
+        contextBar.style.display = 'block';
+    };
+    
+    // Function to remove document from context
+    window.removeFromContext = function(docId) {
+        // Find document in context
+        const docIndex = ragContext.documents.findIndex(d => d.id === docId);
+        if (docIndex === -1) return;
+        
+        // Subtract tokens
+        ragContext.currentTokens -= ragContext.documents[docIndex].tokens || 0;
+        
+        // Remove document from context
+        ragContext.documents.splice(docIndex, 1);
+        
+        // Update UI
+        updateContextUI();
+        
+        // Hide context bar if empty
+        if (ragContext.documents.length === 0) {
+            contextBar.style.display = 'none';
+        }
+    };
+    
+    // Function to clear all context
+    function clearContext() {
+        ragContext.documents = [];
+        ragContext.currentTokens = 0;
+        updateContextUI();
+        contextBar.style.display = 'none';
+    }
+    
+    // Function to update context UI
+    function updateContextUI() {
+        const contextItems = document.getElementById('contextItems');
+        const tokenCount = document.getElementById('tokenCount');
+        const tokenLimit = document.getElementById('tokenLimit');
+        const tokenUsed = document.getElementById('tokenUsed');
+        
+        if (!contextItems || !tokenCount || !tokenLimit || !tokenUsed) return;
+        
+        // Update context items
+        contextItems.innerHTML = '';
+        ragContext.documents.forEach(doc => {
+            const item = document.createElement('div');
+            item.className = 'context-item';
+            item.innerHTML = `
+                <div class="context-item-title" title="${doc.title}">${doc.title}</div>
+                <div class="context-item-remove" data-id="${doc.id}">×</div>
+            `;
+            contextItems.appendChild(item);
+            
+            // Add event listener to remove button
+            const removeBtn = item.querySelector('.context-item-remove');
+            if (removeBtn) {
+                removeBtn.addEventListener('click', () => {
+                    window.removeFromContext(doc.id);
+                });
+            }
+        });
+        
+        // Update token count
+        tokenCount.textContent = ragContext.currentTokens;
+        tokenLimit.textContent = ragContext.maxTokens;
+        
+        // Update token bar
+        const percentage = Math.min(100, (ragContext.currentTokens / ragContext.maxTokens) * 100);
+        tokenUsed.style.width = `${percentage}%`;
+        
+        // Update token bar color based on usage
+        tokenUsed.className = 'token-used';
+        if (percentage > 90) {
+            tokenUsed.classList.add('token-high');
+        } else if (percentage > 70) {
+            tokenUsed.classList.add('token-medium');
+        } else {
+            tokenUsed.classList.add('token-low');
+        }
+    }
+    
+    // Function to automatically suggest context based on user message
+    window.suggestContext = function(message) {
+        if (!ragContext.autoSuggest) return;
+        
+        // In a real implementation, this would make an API call to the backend
+        // to get context suggestions based on the message
+        console.log('Auto-suggesting context for:', message);
+        
+        // For now, we'll just display a placeholder message
+        console.log('Auto-suggest is enabled but not implemented yet');
+    };
+});
+</script>

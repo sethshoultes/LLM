@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLM Interface</title>
+    <!-- CSS -->
+    {% block styles %}
+    {% include "assets/css/main.css" %}
+    {% endblock %}
+    
+    <!-- Extension point for HEAD -->
+    {% block head_extensions %}{% endblock %}
+</head>
+<body {% if rag_enabled %}data-rag-enabled="true"{% endif %}>
+    <!-- Extension point for HEADER_NAV -->
+    {% block header_nav %}{% endblock %}
+    
+    <h1>Portable LLM Interface</h1>
+    
+    <div class="interface-container">
+        <!-- Sidebar - only rendered if RAG is enabled -->
+        {% if rag_enabled %}
+            {% include "components/sidebar.html" %}
+        {% endif %}
+        
+        <div class="main-content">
+            <!-- Models card -->
+            <div class="card">
+                <h2>Available Models</h2>
+                <div id="modelList" class="model-list">Loading models...</div>
+            </div>
+            
+            <!-- Extension point for SIDEBAR -->
+            {% block sidebar_extensions %}{% endblock %}
+            
+            <!-- Model selection card -->
+            <div class="card">
+                <h2>Model Selection</h2>
+                {% include "components/model_selector.html" %}
+            </div>
+            
+            <!-- Chat card -->
+            <div class="card">
+                <h2>Chat</h2>
+                
+                <!-- Extension point for MAIN_CONTROLS -->
+                {% block main_controls %}{% endblock %}
+                
+                {% if rag_enabled %}
+                {% include "components/context_bar.html" %}
+                {% endif %}
+                
+                {% include "components/chat_interface.html" %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Extension point for DIALOGS -->
+    {% block dialogs %}{% endblock %}
+    
+    <!-- JavaScript -->
+    {% block scripts %}
+    {% include "assets/js/main.js" %}
+    {% endblock %}
+    
+    <!-- Extension point for SCRIPTS -->
+    {% block script_extensions %}{% endblock %}
+</body>
+</html>

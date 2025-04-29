@@ -318,6 +318,7 @@ class SimpleSearch:
         
         contexts = []
         total_length = 0
+        total_tokens = 0
         
         for doc in docs:
             # Get full document content
@@ -328,32 +329,79 @@ class SimpleSearch:
             content = full_doc.get("content", "")
             title = full_doc.get("title", "")
             
-            # Determine how much content to include
-            remaining_chars = max_chars - total_length
-            if remaining_chars <= 0:
-                break
+            # Estimate token count for this document
+            doc_title_text = f"# {title}\n\n"
+            doc_token_count = self.estimate_token_count(doc_title_text + content)
             
-            # Include title and truncated content if needed
-            context_text = f"# {title}\n\n"
-            if len(content) > remaining_chars - len(context_text):
-                context_text += content[:remaining_chars - len(context_text)] + "..."
+            # Check if we need to limit the content
+            max_tokens = int(max_chars / 4)  # Approximate token limit
+            remaining_tokens = max_tokens - total_tokens
+            
+            if remaining_tokens <= 0:
+                break
+                
+            # Create context entry
+            if doc_token_count > remaining_tokens:
+                # Need to truncate
+                # First, estimate tokens for just the title
+                title_tokens = self.estimate_token_count(doc_title_text)
+                
+                # Calculate how many tokens we can use for content
+                content_tokens = remaining_tokens - title_tokens
+                
+                # Estimate characters based on token count (rough approximation)
+                content_chars = content_tokens * 4
+                
+                # Truncate content
+                truncated_content = content[:content_chars] + "..."
+                context_text = doc_title_text + truncated_content
+                
+                # Update the doc token count to the actual used amount
+                doc_token_count = self.estimate_token_count(context_text)
             else:
-                context_text += content
+                # Can use the full document
+                context_text = doc_title_text + content
             
             contexts.append({
                 "id": doc["id"],
                 "title": title,
                 "content": context_text,
-                "score": doc.get("score", 0)
+                "score": doc.get("score", 0),
+                "tokens": doc_token_count,
+                "truncated": doc_token_count < self.estimate_token_count(doc_title_text + content)
             })
             
             total_length += len(context_text)
+            total_tokens += doc_token_count
             
             # Stop if we've reached the maximum size
-            if total_length >= max_chars:
+            if total_tokens >= max_tokens:
                 break
-        
+                
+        # Add token information to the overall result
+        for context in contexts:
+            context["token_percentage"] = round((context["tokens"] / total_tokens) * 100 if total_tokens > 0 else 0, 1)
+            
         return contexts
+        
+    def estimate_token_count(self, text: str) -> int:
+        """Estimate the number of tokens in a text string
+        
+        This is a simple approximation - 1 token is roughly 4 characters for English text.
+        For more accurate counts, a proper tokenizer should be used.
+        """
+        if not text:
+            return 0
+            
+        # Simple approximation: 1 token is roughly 4 characters for English text
+        char_count = len(text)
+        token_estimate = char_count // 4
+        
+        # Account for whitespace and newlines which are typically tokenized differently
+        whitespace_count = len([c for c in text if c.isspace()])
+        whitespace_token_adjustment = whitespace_count // 8  # Adjust for whitespace
+        
+        return max(1, token_estimate + whitespace_token_adjustment)
 
 # Create a default instance
 search_engine = SimpleSearch()

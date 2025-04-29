@@ -1,0 +1,253 @@
+<style>
+body {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    line-height: 1.6;
+    color: #333;
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 2rem;
+    background-color: #f5f7f9;
+}
+
+.interface-container {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+}
+
+/* With RAG enabled, we have a sidebar */
+body[data-rag-enabled="true"] .interface-container {
+    grid-template-columns: 250px 1fr;
+}
+
+/* Collapsible sidebar */
+.sidebar {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    padding: 1rem;
+    position: relative;
+    transition: width 0.3s ease;
+}
+
+.sidebar-collapsed .sidebar {
+    width: 40px;
+    overflow: hidden;
+}
+
+.sidebar-toggle {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: none;
+    border: none;
+    font-size: 1.2rem;
+    cursor: pointer;
+    color: #666;
+    padding: 0;
+    z-index: 10;
+}
+
+.card {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    padding: 2rem;
+    margin-bottom: 2rem;
+}
+
+h1, h2, h3 {
+    margin-top: 0;
+    color: #2a2a2a;
+}
+
+pre {
+    background: #f5f5f5;
+    padding: 1rem;
+    border-radius: 4px;
+    overflow: auto;
+}
+
+button {
+    background-color: #0070f3;
+    color: white;
+    border: none;
+    padding: 0.8rem 1.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background-color 0.2s;
+}
+
+button:hover {
+    background-color: #0051a2;
+}
+
+button:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+}
+
+.model-list {
+    margin-top: 1rem;
+}
+
+.model-item {
+    padding: 0.8rem;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.model-info {
+    flex: 1;
+}
+
+textarea {
+    width: 100%;
+    height: 100px;
+    padding: 0.8rem;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+    margin-bottom: 1rem;
+    font-family: inherit;
+    font-size: 1rem;
+    resize: vertical;
+}
+
+.response {
+    background-color: #f9f9f9;
+    padding: 1.5rem;
+    border-radius: 8px;
+    border-left: 4px solid #0070f3;
+    margin-top: 1rem;
+    white-space: pre-wrap;
+}
+
+.loading {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid rgba(0,0,0,.1);
+    border-radius: 50%;
+    border-top-color: #0070f3;
+    animation: spin 1s ease-in-out infinite;
+    margin-left: 10px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.stats {
+    font-size: 0.8rem;
+    color: #666;
+    margin-top: 0.5rem;
+}
+
+select {
+    width: 100%;
+    padding: 0.8rem;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+    margin-bottom: 1rem;
+    font-size: 1rem;
+}
+
+.parameter-controls {
+    background: #f5f7f9;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.parameter-row {
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+}
+
+.parameter-row label {
+    width: 40%;
+    font-size: 0.9rem;
+}
+
+.parameter-row input[type="range"] {
+    flex: 1;
+}
+
+.chat-history {
+    max-height: 400px;
+    overflow-y: auto;
+    margin-bottom: 1rem;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    padding: 1rem;
+    background: #fafafa;
+}
+
+.chat-message {
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #eee;
+}
+
+.chat-message:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.message-user {
+    background-color: #f0f7ff;
+    border-radius: 8px;
+    padding: 0.8rem;
+    margin-bottom: 0.5rem;
+}
+
+.message-assistant {
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    padding: 0.8rem;
+    border-left: 4px solid #0070f3;
+    white-space: pre-wrap;
+}
+
+.message-meta {
+    font-size: 0.8rem;
+    color: #666;
+    margin-top: 0.3rem;
+    text-align: right;
+}
+
+.message-input {
+    display: flex;
+    gap: 0.8rem;
+    margin-bottom: 1rem;
+}
+
+.message-input textarea {
+    flex: 1;
+    margin-bottom: 0;
+}
+
+.chat-controls {
+    display: flex;
+    gap: 0.8rem;
+    margin-bottom: 1rem;
+}
+
+.secondary-btn {
+    background-color: #f5f5f5;
+    color: #333;
+    border: 1px solid #ddd;
+    padding: 0.6rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.secondary-btn:hover {
+    background-color: #e9e9e9;
+}
+</style>

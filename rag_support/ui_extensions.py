@@ -114,6 +114,24 @@ RAG_CSS = """
     font-size: 0.9rem;
 }
 
+.context-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.context-header h3 {
+    margin: 0;
+    font-size: 1rem;
+    color: #333;
+}
+
+.small-btn {
+    padding: 0.2rem 0.4rem;
+    font-size: 0.8rem;
+}
+
 .context-title {
     font-weight: 500;
     margin-bottom: 0.3rem;
@@ -125,6 +143,7 @@ RAG_CSS = """
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
+    margin-bottom: 0.8rem;
 }
 
 .context-item {
@@ -135,6 +154,45 @@ RAG_CSS = """
     display: flex;
     align-items: center;
     gap: 0.3rem;
+}
+
+.context-stats {
+    margin-top: 0.8rem;
+    font-size: 0.8rem;
+    color: #666;
+}
+
+.token-usage {
+    margin-bottom: 0.5rem;
+}
+
+.token-bar {
+    height: 8px;
+    background-color: #eee;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 0.3rem;
+}
+
+.token-used {
+    height: 100%;
+    background-color: #0070f3;
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.token-used.warning {
+    background-color: #f5a623;
+}
+
+.token-used.danger {
+    background-color: #ff4d4f;
+}
+
+.token-info {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
 }
 
 .remove-context {
@@ -334,8 +392,24 @@ RAG_SIDEBAR_HTML = """
 
 RAG_CONTEXT_BAR_HTML = """
 <div class="context-bar" id="contextBar" style="display: none;">
-    <div class="context-title">Context Documents:</div>
+    <div class="context-header">
+        <h3>Context Documents</h3>
+        <button id="refreshTokens" class="secondary-btn small-btn" title="Refresh token count">⟳</button>
+    </div>
     <div class="context-items" id="contextItems"></div>
+    
+    <div class="context-stats" id="contextStats">
+        <div class="token-usage">
+            <div class="token-bar">
+                <div class="token-used" id="tokenUsed" style="width: 0%"></div>
+            </div>
+            <div class="token-info">
+                <span id="tokenCount">0</span> tokens used
+                (<span id="tokenPercentage">0%</span> of context window)
+            </div>
+        </div>
+    </div>
+    
     <div class="toggle-switch" style="margin-top: 0.5rem;">
         <label for="autoContextToggle">Auto-suggest context:</label>
         <label class="switch">
@@ -474,6 +548,10 @@ function setupRagEventListeners() {
     
     // Context management
     document.getElementById('autoContextToggle')?.addEventListener('change', toggleAutoContext);
+    document.getElementById('refreshTokens')?.addEventListener('click', updateTokenCounts);
+    
+    // Monitor user input to update token counts
+    document.getElementById('userInput')?.addEventListener('input', debounce(updateTokenCounts, 500));
     
     // Document viewing
     document.getElementById('closeViewDocumentBtn')?.addEventListener('click', hideViewDocumentDialog);
@@ -587,6 +665,34 @@ async function suggestRelevantDocuments(projectId, query) {
     }
 }
 
+async function estimateTokens(projectId, text, contextDocs) {
+    try {
+        const response = await fetch('/api/tokens', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                project_id: projectId,
+                text: text,
+                context_docs: contextDocs
+            })
+        });
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error('Error estimating tokens:', error);
+        return {
+            total_tokens: 0,
+            text_tokens: 0,
+            context_tokens: 0,
+            contexts: [],
+            available_tokens: 0,
+            is_over_limit: false
+        };
+    }
+}
+
 // UI Functions
 function populateProjectSelector(projects) {
     const selector = document.getElementById('projectSelect');
@@ -683,6 +789,80 @@ function updateContextBar() {
             removeFromContext(item.dataset.id);
         });
     });
+    
+    // Update token counts
+    updateTokenCounts();
+}
+
+async function updateTokenCounts() {
+    if (!ragState.currentProject || ragState.contextDocuments.length === 0) {
+        // Reset token display
+        resetTokenDisplay();
+        return;
+    }
+    
+    // Get current user input
+    const userInput = document.getElementById('userInput')?.value || '';
+    
+    // Get context document IDs
+    const contextDocIds = ragState.contextDocuments.map(doc => doc.id);
+    
+    try {
+        // Call token estimation API
+        const tokenInfo = await estimateTokens(
+            ragState.currentProject,
+            userInput,
+            contextDocIds
+        );
+        
+        // Update token display
+        updateTokenDisplay(tokenInfo);
+        
+    } catch (error) {
+        console.error('Error updating token counts:', error);
+        resetTokenDisplay();
+    }
+}
+
+function updateTokenDisplay(tokenInfo) {
+    const tokenUsedElement = document.getElementById('tokenUsed');
+    const tokenCountElement = document.getElementById('tokenCount');
+    const tokenPercentageElement = document.getElementById('tokenPercentage');
+    
+    if (!tokenUsedElement || !tokenCountElement || !tokenPercentageElement) {
+        return;
+    }
+    
+    // Update token count text
+    tokenCountElement.textContent = tokenInfo.total_tokens;
+    tokenPercentageElement.textContent = `${tokenInfo.usage_percentage}%`;
+    
+    // Update token usage bar
+    tokenUsedElement.style.width = `${tokenInfo.usage_percentage}%`;
+    
+    // Add warning or danger classes based on usage
+    tokenUsedElement.classList.remove('warning', 'danger');
+    if (tokenInfo.usage_percentage > 90) {
+        tokenUsedElement.classList.add('danger');
+    } else if (tokenInfo.usage_percentage > 75) {
+        tokenUsedElement.classList.add('warning');
+    }
+}
+
+function resetTokenDisplay() {
+    const tokenUsedElement = document.getElementById('tokenUsed');
+    const tokenCountElement = document.getElementById('tokenCount');
+    const tokenPercentageElement = document.getElementById('tokenPercentage');
+    
+    if (!tokenUsedElement || !tokenCountElement || !tokenPercentageElement) {
+        return;
+    }
+    
+    // Reset to zero
+    tokenCountElement.textContent = '0';
+    tokenPercentageElement.textContent = '0%';
+    tokenUsedElement.style.width = '0%';
+    tokenUsedElement.classList.remove('warning', 'danger');
 }
 
 // Actions
@@ -1110,6 +1290,15 @@ function formatMarkdown(text) {
     return html;
 }
 
+// Utility function to debounce frequent events
+function debounce(func, delay) {
+    let timeout;
+    return function(...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), delay);
+    };
+}
+
 // Helper function to add message to history (copied from existing chat UI)
 function addMessageToHistory(role, content) {
     if (typeof chatHistory === 'undefined') {
@@ -1134,15 +1323,37 @@ function addMessageToHistory(role, content) {
 
 // Inject RAG UI elements and initialize
 document.addEventListener('DOMContentLoaded', function() {
-    // Wrap the main content
-    const mainContent = document.body.innerHTML;
-    document.body.innerHTML = `
-        <div class="interface-container">
-            ${RAG_SIDEBAR_HTML}
-            <div class="main-content">${mainContent}</div>
-        </div>
-        ${RAG_DIALOGS_HTML}
-    `;
+    // Create a wrapper for the content instead of replacing innerHTML directly
+    const wrapper = document.createElement('div');
+    wrapper.className = 'interface-container';
+    
+    // Create sidebar element
+    const sidebar = document.createElement('div');
+    sidebar.innerHTML = RAG_SIDEBAR_HTML;
+    
+    // Create main content container
+    const mainContent = document.createElement('div');
+    mainContent.className = 'main-content';
+    
+    // Move all body children to main content
+    while (document.body.firstChild) {
+        mainContent.appendChild(document.body.firstChild);
+    }
+    
+    // Add sidebar and main content to wrapper
+    wrapper.appendChild(sidebar.firstElementChild);
+    wrapper.appendChild(mainContent);
+    
+    // Create dialogs container
+    const dialogs = document.createElement('div');
+    dialogs.className = 'rag-dialogs';
+    dialogs.innerHTML = RAG_DIALOGS_HTML;
+    
+    // Add wrapper and dialogs to body
+    document.body.appendChild(wrapper);
+    while (dialogs.firstChild) {
+        document.body.appendChild(dialogs.firstChild);
+    }
     
     // Inject CSS
     const styleTag = document.createElement('style');
@@ -1188,6 +1399,14 @@ def get_extended_html_template():
     # Apply extensions to template
     for point, content in extensions.items():
         marker = f'<!-- EXTENSION_POINT: {point} -->'
-        html = html.replace(marker, f'{marker}\n{content}')
+        
+        # For the SCRIPTS extension point, wrap in proper script tags
+        if point == "SCRIPTS":
+            # Properly escape any problematic JavaScript characters
+            # Ensure the script content is properly formatted
+            escaped_content = content.replace('${', r'$\{').replace('`', r'\`')
+            html = html.replace(marker, f'{marker}\n{escaped_content}')
+        else:
+            html = html.replace(marker, f'{marker}\n{content}')
     
     return html

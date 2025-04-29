@@ -1,0 +1,1 @@
+# Initialize templates module

@@ -14,9 +14,74 @@ import time
 import logging
 import traceback
 
+# Error handling utilities
+class ErrorHandler:
+    """Centralized error handling with consistent formatting and logging"""
+    
+    @staticmethod
+    def format_error(error, include_traceback=False):
+        """Format an error message with optional traceback"""
+        error_type = type(error).__name__
+        error_message = str(error)
+        
+        formatted = f"Error: {error_type} - {error_message}"
+        
+        if include_traceback:
+            tb = traceback.format_exc()
+            formatted += f"\n\nTraceback:\n{tb}"
+            
+        return formatted
+    
+    @staticmethod
+    def log_error(error, context="", level=logging.ERROR, include_traceback=False):
+        """Log an error with consistent formatting"""
+        logger = logging.getLogger("llm_interface")
+        
+        if context:
+            message = f"[{context}] {ErrorHandler.format_error(error, include_traceback=False)}"
+        else:
+            message = ErrorHandler.format_error(error, include_traceback=False)
+            
+        logger.log(level, message)
+        
+        if include_traceback:
+            logger.debug(f"Traceback for error in {context or 'unknown context'}:\n{traceback.format_exc()}")
+    
+    @staticmethod
+    def handle_api_error(error, context="", include_traceback=False):
+        """Format an error for API response"""
+        ErrorHandler.log_error(error, context, include_traceback=include_traceback)
+        
+        response = {
+            "error": str(error),
+            "error_type": type(error).__name__,
+            "context": context
+        }
+        
+        if include_traceback:
+            response["traceback"] = traceback.format_exc()
+            
+        return response
+    
+    @staticmethod
+    def handle_request_error(handler, status_code, error, context=""):
+        """Handle an error during request processing"""
+        ErrorHandler.log_error(error, context, include_traceback=DEBUG_MODE)
+        
+        handler.send_error(
+            status_code, 
+            explain=ErrorHandler.format_error(error, include_traceback=False)
+        )
+
 # Disable debug logs
 os.environ["LLAMA_CPP_VERBOSE"] = "0"  # Suppress llama.cpp debug logs
-logging.basicConfig(level=logging.ERROR)  # Only show error messages
+
+# Import jinja2 for templating
+try:
+    import jinja2
+except ImportError:
+    print("Jinja2 not installed. Please install with: pip install jinja2")
+    jinja2 = None
 
 # Define the port range to try
 START_PORT = 5100
@@ -28,10 +93,103 @@ BASE_DIR = SCRIPT_DIR.parent
 # Use environment variable if available
 BASE_DIR = Path(os.environ.get("LLM_BASE_DIR", str(BASE_DIR)))
 
-# Check if RAG is enabled
-RAG_ENABLED = os.environ.get("LLM_RAG_ENABLED") == "1"
+# Set up template directories
+TEMPLATES_DIR = BASE_DIR / "templates"
+LAYOUTS_DIR = TEMPLATES_DIR / "layouts"
+COMPONENTS_DIR = TEMPLATES_DIR / "components"
+ASSETS_DIR = TEMPLATES_DIR / "assets"
 
-# HTML template for the main page
+# Set up Jinja2 environment if available
+if jinja2:
+    try:
+        template_loader = jinja2.FileSystemLoader(searchpath=TEMPLATES_DIR)
+        template_env = jinja2.Environment(loader=template_loader)
+        print(f"Template directory: {TEMPLATES_DIR}")
+    except Exception as e:
+        print(f"Error setting up Jinja2: {e}")
+        template_env = None
+else:
+    template_env = None
+
+# Check for environment flags
+RAG_ENABLED = os.environ.get("LLM_RAG_ENABLED") == "1"
+DEBUG_MODE = os.environ.get("LLM_DEBUG_MODE") == "1"
+
+# Configure logging based on debug mode
+if DEBUG_MODE:
+    logging.basicConfig(level=logging.DEBUG, 
+                       format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    print("Debug mode is enabled - showing detailed logs")
+else:
+    logging.basicConfig(level=logging.ERROR)
+
+# Setup paths
+try:
+    # Ensure base directories exist
+    BASE_DIR.mkdir(exist_ok=True)
+    
+    # Ensure PYTHONPATH includes necessary directories
+    for path in [str(BASE_DIR), str(SCRIPT_DIR)]:
+        if path not in sys.path:
+            sys.path.insert(0, path)
+    
+    # Log configuration details when in debug mode
+    if DEBUG_MODE:
+        print(f"BASE_DIR: {BASE_DIR}")
+        print(f"SCRIPT_DIR: {SCRIPT_DIR}")
+        print(f"RAG_ENABLED: {RAG_ENABLED}")
+        print(f"DEBUG_MODE: {DEBUG_MODE}")
+        print(f"sys.path: {sys.path}")
+except Exception as e:
+    print(f"Error during path setup: {e}")
+    if DEBUG_MODE:
+        traceback.print_exc()
+
+# Template rendering function
+def render_template(template_name, **kwargs):
+    """Render a template with the given kwargs
+    
+    Falls back to the static HTML template if Jinja2 is not available or if
+    the template file is not found.
+    """
+    if not template_env:
+        # Log warning about using fallback HTML
+        print("Warning: Jinja2 not available, using fallback HTML template")
+        return get_fallback_html(RAG_ENABLED)
+    
+    try:
+        # Try to load the template
+        template = template_env.get_template(template_name)
+        return template.render(**kwargs)
+    except jinja2.exceptions.TemplateNotFound:
+        print(f"Warning: Template {template_name} not found, using fallback HTML")
+        return get_fallback_html(RAG_ENABLED)
+    except Exception as e:
+        print(f"Error rendering template {template_name}: {e}")
+        if DEBUG_MODE:
+            traceback.print_exc()
+        return get_fallback_html(RAG_ENABLED)
+
+# Fallback HTML template for when templates or Jinja2 are not available
+def get_fallback_html(rag_enabled=False):
+    """Get the fallback HTML template
+    
+    This is used when Jinja2 is not available or if template files are not found.
+    """
+    if rag_enabled and RAG_ENABLED:
+        try:
+            from rag_support.ui_extensions import get_extended_html_template
+            return get_extended_html_template()
+        except ImportError:
+            print("Error loading RAG UI extensions, using standard template")
+            return HTML_TEMPLATE
+        except Exception as e:
+            print(f"Error applying RAG extensions: {e}")
+            return HTML_TEMPLATE
+    else:
+        return HTML_TEMPLATE
+
+# HTML template for the main page (fallback if templates are unavailable)
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
@@ -640,12 +798,16 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(json.dumps(response_data).encode('utf-8'))
                 return
             except ImportError as e:
-                self.send_error(500, f"Error loading RAG modules: {str(e)}")
-                traceback.print_exc()
+                ErrorHandler.handle_request_error(
+                    self, 500, e, 
+                    context=f"RAG API GET (ImportError): {parsed_path.path}"
+                )
                 return
             except Exception as e:
-                self.send_error(500, f"Error handling RAG API request: {str(e)}")
-                traceback.print_exc()
+                ErrorHandler.handle_request_error(
+                    self, 500, e, 
+                    context=f"RAG API GET: {parsed_path.path}"
+                )
                 return
         
         # Standard request handling
@@ -654,25 +816,23 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
             self.send_header('Content-type', 'text/html')
             self.end_headers()
             
-            # If RAG is enabled, use the extended template
-            html_template = HTML_TEMPLATE
-            if RAG_ENABLED:
-                try:
-                    from rag_support.ui_extensions import get_extended_html_template
-                    html_template = get_extended_html_template()
-                    print("RAG UI extensions loaded")
-                except ImportError as e:
-                    print(f"Error loading RAG UI extensions: {e}")
-                    traceback.print_exc()
-                except Exception as e:
-                    print(f"Unexpected error loading RAG UI: {e}")
-                    traceback.print_exc()
-            
-            # If RAG is enabled, add data attribute to body tag
-            if RAG_ENABLED:
-                html_template = html_template.replace("<body>", "<body data-rag-enabled=\"true\">")
-            
-            self.wfile.write(html_template.encode('utf-8'))
+            # Render template or use fallback
+            try:
+                if template_env:
+                    # Use Jinja2 templates
+                    html = render_template("layouts/main.html", rag_enabled=RAG_ENABLED)
+                    print("Using Jinja2 templates")
+                else:
+                    # Use fallback template with extension points
+                    html = get_fallback_html(RAG_ENABLED)
+                    print("Using fallback HTML template")
+                
+                # Write the HTML response
+                self.wfile.write(html.encode('utf-8'))
+            except Exception as e:
+                error_context = "Rendering main page template"
+                ErrorHandler.log_error(e, error_context, include_traceback=DEBUG_MODE)
+                self.send_error(500, f"Error rendering template: {str(e)}")
         elif parsed_path.path == '/api/models':
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
@@ -688,7 +848,7 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
         parsed_path = urllib.parse.urlparse(self.path)
         
         # Handle RAG API requests if enabled
-        if RAG_ENABLED and parsed_path.path.startswith('/api/projects'):
+        if RAG_ENABLED and (parsed_path.path.startswith('/api/projects') or parsed_path.path.startswith('/api/tokens')):
             try:
                 # Import the RAG API handler
                 from rag_support.api_extensions import api_handler
@@ -711,12 +871,22 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(json.dumps(response_data).encode('utf-8'))
                 return
             except ImportError as e:
-                self.send_error(500, f"Error loading RAG modules: {str(e)}")
-                traceback.print_exc()
+                ErrorHandler.handle_request_error(
+                    self, 500, e, 
+                    context=f"RAG API POST (ImportError): {parsed_path.path}"
+                )
+                return
+            except json.JSONDecodeError as e:
+                ErrorHandler.handle_request_error(
+                    self, 400, e, 
+                    context=f"RAG API POST (Invalid JSON): {parsed_path.path}"
+                )
                 return
             except Exception as e:
-                self.send_error(500, f"Error handling RAG API request: {str(e)}")
-                traceback.print_exc()
+                ErrorHandler.handle_request_error(
+                    self, 500, e, 
+                    context=f"RAG API POST: {parsed_path.path}"
+                )
                 return
         
         # Standard chat API handling
@@ -738,6 +908,13 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
             # Check for RAG context
             context_docs = request_data.get('context_docs', [])
             context_content = ""
+            context_docs_info = []
+            max_context_tokens = 1200  # Reserve tokens for system prompt, user message, and response
+            
+            # Helper function to estimate token count
+            def estimate_tokens(text):
+                # Roughly 4 chars per token for English text
+                return len(text) // 4
             
             # If we have context docs and RAG is enabled, load the document content
             if RAG_ENABLED and context_docs:
@@ -764,17 +941,63 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                     
                     # Load documents if we have a project ID
                     if project_id:
+                        all_docs = []
+                        # First pass: load all documents and calculate token counts
                         for doc_id in context_docs:
                             doc = project_manager.get_document(project_id, doc_id)
                             if doc:
-                                context_content += f"## {doc.get('title', 'Document')}\n\n"
-                                context_content += doc.get('content', '') + "\n\n"
+                                doc_content = doc.get('content', '')
+                                doc_title = doc.get('title', 'Document')
+                                doc_tokens = estimate_tokens(doc_content)
+                                all_docs.append({
+                                    'id': doc_id,
+                                    'title': doc_title,
+                                    'content': doc_content,
+                                    'tokens': doc_tokens
+                                })
+                        
+                        # Sort by relevance (or token count for now)
+                        all_docs.sort(key=lambda x: x['tokens'])
+                        
+                        # Second pass: add documents until we hit the token limit
+                        current_tokens = 0
+                        for doc in all_docs:
+                            # Check if adding this document would exceed our token limit
+                            if current_tokens + doc['tokens'] > max_context_tokens:
+                                # If this is the first document, we need to truncate it
+                                if len(context_docs_info) == 0:
+                                    # Take as much as we can from this document
+                                    max_chars = max_context_tokens * 4
+                                    truncated_content = doc['content'][:max_chars] + "...[truncated]"
+                                    context_content += f"## {doc['title']}\n\n{truncated_content}\n\n"
+                                    context_docs_info.append({
+                                        'id': doc['id'],
+                                        'title': doc['title'],
+                                        'tokens': estimate_tokens(truncated_content),
+                                        'truncated': True
+                                    })
+                                    current_tokens += estimate_tokens(truncated_content)
+                                break
+                            
+                            # Add this document to our context
+                            context_content += f"## {doc['title']}\n\n{doc['content']}\n\n"
+                            context_docs_info.append({
+                                'id': doc['id'],
+                                'title': doc['title'],
+                                'tokens': doc['tokens'],
+                                'truncated': False
+                            })
+                            current_tokens += doc['tokens']
                         
                         # Add context to system message
                         if context_content:
                             if system_message:
                                 system_message += "\n\n"
                             system_message += "Use the following information to answer the user's question:\n\n" + context_content
+                            
+                            print(f"Added {len(context_docs_info)} documents to context. Total tokens: {current_tokens}")
+                            for doc in context_docs_info:
+                                print(f"- {doc['title']}: {doc['tokens']} tokens {'(truncated)' if doc.get('truncated') else ''}")
                 except ImportError as e:
                     print(f"Error loading context: {e}")
                     traceback.print_exc()
@@ -839,18 +1062,25 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                         response["context_used"] = True
                         response["context_count"] = len(context_docs)
                 
-            except ImportError:
-                # Fall back to the placeholder response
+            except ImportError as e:
+                error_context = "Loading inference module"
+                ErrorHandler.log_error(e, context=error_context, include_traceback=DEBUG_MODE)
                 response = {
-                    "response": f"You selected model: {model_path}\nYour message: {message}\n\nThis is a placeholder response since the inference module could not be loaded. Please make sure llama-cpp-python is installed.",
-                    "model": model_path
+                    "error": f"Error: Could not load inference module. {str(e)}",
+                    "error_type": "ImportError",
+                    "model": model_path,
+                    "recommendation": "Please make sure the required libraries are installed (llama-cpp-python or transformers)"
                 }
+                if DEBUG_MODE:
+                    response["traceback"] = traceback.format_exc()
             except Exception as e:
-                import traceback
-                response = {
-                    "error": f"Error generating response: {str(e)}",
-                    "model": model_path
-                }
+                error_context = f"Generating response for model {model_path}"
+                response = ErrorHandler.handle_api_error(
+                    e, 
+                    context=error_context, 
+                    include_traceback=DEBUG_MODE
+                )
+                response["model"] = model_path
             
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
@@ -873,22 +1103,46 @@ if __name__ == '__main__':
         
         # Verify RAG support is accessible
         try:
-            # Import and initialize RAG modules
-            import rag_support
-            from rag_support.utils import project_manager
-            print(f"RAG support modules loaded successfully")
+            # Import and initialize RAG modules - use a context manager to capture import errors
+            import importlib
             
+            # Try to import rag_support
+            try:
+                import rag_support
+                print(f"RAG support core module loaded successfully")
+            except ImportError as e:
+                print(f"Critical error: Failed to import rag_support module: {e}")
+                if DEBUG_MODE:
+                    traceback.print_exc()
+                print("Disabling RAG features due to import error")
+                RAG_ENABLED = False
+                raise ImportError(f"Critical RAG module import error: {e}")
+            
+            # Try to import utils 
+            try:
+                from rag_support.utils import project_manager
+                print(f"RAG support utility modules loaded successfully")
+            except ImportError as e:
+                print(f"Error importing RAG utility modules: {e}")
+                if DEBUG_MODE:
+                    traceback.print_exc()
+                
             # Initialize directories
-            rag_support.init_directories()
-            print(f"RAG directories initialized at {rag_support.BASE_DIR}")
-        except ImportError as e:
-            print(f"Warning: Error importing RAG modules: {e}")
-            print(f"RAG features may not work correctly.")
-            traceback.print_exc()
+            try:
+                result = rag_support.init_directories()
+                if result:
+                    print(f"RAG directories initialized successfully at {rag_support.BASE_DIR}")
+                else:
+                    print(f"Warning: RAG directory initialization returned False")
+            except Exception as e:
+                print(f"Error initializing RAG directories: {e}")
+                if DEBUG_MODE:
+                    traceback.print_exc()
         except Exception as e:
-            print(f"Warning: Error initializing RAG: {e}")
-            print(f"RAG features may not work correctly.")
-            traceback.print_exc()
+            print(f"Warning: Error in RAG initialization: {e}")
+            print(f"Some RAG features may not work correctly.")
+            if DEBUG_MODE:
+                traceback.print_exc()
     
     # Try to find an available port
     for port in range(START_PORT, END_PORT + 1):

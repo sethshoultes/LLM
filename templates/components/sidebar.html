@@ -1,0 +1,50 @@
+<div class="sidebar" id="sidebar">
+    <button class="sidebar-toggle" id="sidebarToggle" title="Toggle Sidebar">⋮</button>
+    
+    <div class="sidebar-section">
+        <div class="project-selector">
+            <select id="projectSelect">
+                <option value="">Select Project</option>
+            </select>
+            <button class="secondary-btn action-button" id="newProjectBtn">
+                New Project
+            </button>
+        </div>
+        <div class="project-info" id="projectInfo">
+            No project selected
+        </div>
+    </div>
+    
+    <div class="sidebar-section">
+        <div class="action-bar">
+            <button class="secondary-btn action-button" id="addDocumentBtn">
+                Add Document
+            </button>
+            <div class="spacer"></div>
+            <button class="secondary-btn action-button" id="refreshDocsBtn">
+                ↻
+            </button>
+        </div>
+        
+        <div class="search-container">
+            <input type="text" class="search-input" id="documentSearch" placeholder="Search documents...">
+            <button class="clear-search" id="clearSearch">×</button>
+        </div>
+    </div>
+    
+    <div class="document-list" id="documentList">
+        <div class="empty-state">No documents found</div>
+    </div>
+</div>
+
+<script>
+// Add the sidebar toggle functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const sidebarToggle = document.getElementById('sidebarToggle');
+    if (sidebarToggle) {
+        sidebarToggle.addEventListener('click', function() {
+            document.body.classList.toggle('sidebar-collapsed');
+        });
+    }
+});
+</script>

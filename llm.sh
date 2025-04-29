@@ -12,16 +12,48 @@ NC='\033[0m' # No Color
 # Get the directory of this script
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
-# Check for RAG mode
+# Initialize flags
 RAG_ENABLED=0
-if [ "$1" == "rag" ]; then
-    RAG_ENABLED=1
-    shift  # Remove the rag argument
-fi
+DEBUG_MODE=0
+COMMAND="start"
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --rag)
+            RAG_ENABLED=1
+            shift
+            ;;
+        --debug)
+            DEBUG_MODE=1
+            shift
+            ;;
+        --help|-h)
+            COMMAND="help"
+            shift
+            ;;
+        download|samples)
+            COMMAND="$1"
+            shift
+            ;;
+        *)
+            # If it doesn't start with -- or isn't a known command, treat as unrecognized
+            if [[ "$1" == --* ]]; then
+                echo -e "${RED}Unrecognized option: $1${NC}"
+                COMMAND="help"
+            else
+                echo -e "${RED}Unrecognized command: $1${NC}"
+                COMMAND="help"
+            fi
+            shift
+            ;;
+    esac
+done
 
 # Set environment variables
 export LLM_BASE_DIR="$DIR"
 export LLM_RAG_ENABLED="$RAG_ENABLED"
+export LLM_DEBUG_MODE="$DEBUG_MODE"
 export PYTHONPATH="$DIR:$PYTHONPATH"
 
 # Activate the virtual environment
@@ -52,67 +84,55 @@ print_banner() {
 
 # Help message
 print_help() {
-    echo -e "Usage: ./llm.sh [mode] [command]"
+    echo -e "Usage: ./llm.sh [options]"
     echo ""
-    echo -e "Modes:"
-    echo -e "  ${GREEN}rag${NC}          - Enable RAG (Retrieval Augmented Generation) features"
+    echo -e "Options:"
+    echo -e "  ${GREEN}--rag${NC}          Enable RAG (Retrieval Augmented Generation) features"
+    echo -e "  ${GREEN}--debug${NC}        Enable debug mode (shows additional output)"
+    echo -e "  ${GREEN}--help, -h${NC}     Show this help message"
     echo ""
     echo -e "Commands:"
-    echo -e "  ${GREEN}quiet${NC}        - Start the recommended interface (suppresses debug output)"
-    echo -e "  ${GREEN}start${NC}        - Same as quiet"
-    echo -e "  ${GREEN}download${NC}     - Download a model from HuggingFace"
-    echo -e "  ${GREEN}samples${NC}      - Download sample models for testing"
-    echo -e "  ${GREEN}help${NC}         - Show this help message"
+    echo -e "  ${GREEN}download${NC}       Download a model from HuggingFace"
+    echo -e "  ${GREEN}samples${NC}        Download sample models for testing"
     echo ""
     echo -e "Examples:"
-    echo -e "  ${BLUE}./llm.sh${NC}                - Start standard interface"
-    echo -e "  ${BLUE}./llm.sh rag${NC}            - Start with RAG features enabled"
-    echo -e "  ${BLUE}./llm.sh rag quiet${NC}      - Start quiet interface with RAG enabled"
-    echo ""
-    echo -e "Legacy Commands (all redirect to quiet interface):"
-    echo -e "  ${YELLOW}flask${NC}, ${YELLOW}simple${NC}, ${YELLOW}minimal${NC}"
+    echo -e "  ${BLUE}./llm.sh${NC}                        - Start the standard interface"
+    echo -e "  ${BLUE}./llm.sh --rag${NC}                  - Start with RAG features enabled"
+    echo -e "  ${BLUE}./llm.sh --debug${NC}                - Start with debug mode enabled"
+    echo -e "  ${BLUE}./llm.sh --rag --debug${NC}          - Start with both RAG and debug enabled"
+    echo -e "  ${BLUE}./llm.sh download${NC}               - Download models"
     echo ""
     echo -e "Documentation:"
     echo -e "  See the ${BLUE}docs/${NC} directory for detailed documentation"
-    echo -e "  - ${BLUE}docs/USAGE.md${NC}        - User guide"
-    echo -e "  - ${BLUE}docs/MODELS.md${NC}       - Model information"
-    echo -e "  - ${BLUE}docs/RAG_USAGE.md${NC}    - RAG usage guide"
-    echo -e "  - ${BLUE}docs/DEVELOPMENT.md${NC}  - Developer documentation"
+    echo -e "  - ${BLUE}docs/USAGE.md${NC}                 - User guide"
+    echo -e "  - ${BLUE}docs/MODELS.md${NC}                - Model information"
+    echo -e "  - ${BLUE}docs/RAG_USAGE.md${NC}             - RAG usage guide"
+    echo -e "  - ${BLUE}docs/DEVELOPMENT.md${NC}           - Developer documentation"
     echo ""
 }
-
-# Parse command
-COMMAND=${1:-start}
 
 # Execute the requested command
 case "$COMMAND" in
     "start")
         print_banner
-        echo -e "Starting default LLM interface..."
-        if [ "$RAG_ENABLED" == "1" ]; then
-            echo -e "RAG features are ${GREEN}enabled${NC}."
-        fi
-        echo -e "NOTE: If this fails, try one of the alternative launchers:"
-        echo -e "  ./llm.sh quiet   - Recommended quiet interface"
-        echo -e "  ./llm.sh rag     - LLM interface with RAG support"
-        python3 "$DIR/scripts/quiet_interface.py"
-        ;;
-    "quiet")
-        print_banner
-        echo -e "Starting quiet LLM interface..."
-        if [ "$RAG_ENABLED" == "1" ]; then
-            echo -e "RAG features are ${GREEN}enabled${NC}."
-        fi
-        echo -e "This interface suppresses debug output for a cleaner experience."
-        python3 "$DIR/scripts/quiet_interface.py"
-        ;;
-    "flask"|"simple"|"minimal")
-        print_banner
         echo -e "Starting LLM interface..."
+        
+        # Show enabled features
+        FEATURES=""
         if [ "$RAG_ENABLED" == "1" ]; then
-            echo -e "RAG features are ${GREEN}enabled${NC}."
+            FEATURES="${FEATURES}RAG "
+            echo -e "- RAG features are ${GREEN}enabled${NC}"
         fi
-        echo -e "${YELLOW}Note: All interface options now use the quiet interface, which combines the best features.${NC}"
+        if [ "$DEBUG_MODE" == "1" ]; then
+            FEATURES="${FEATURES}Debug "
+            echo -e "- Debug mode is ${GREEN}enabled${NC}"
+        fi
+        
+        if [ -n "$FEATURES" ]; then
+            echo -e "Starting with ${GREEN}${FEATURES}${NC}features enabled."
+        fi
+        
+        # Launch the interface
         python3 "$DIR/scripts/quiet_interface.py"
         ;;
     "download")
@@ -131,7 +151,7 @@ case "$COMMAND" in
         ;;
     *)
         print_banner
-        echo -e "${RED}Unknown command: $COMMAND${NC}"
+        echo -e "${RED}Unknown command!${NC}"
         print_help
         exit 1
         ;;

@@ -10,44 +10,36 @@
 
 ## Command Reference
 
-The main script `llm.sh` accepts various modes and commands:
+The main script `llm.sh` accepts various flags and commands:
 
 ```bash
-./llm.sh [MODE] [COMMAND]
+./llm.sh [OPTIONS] [COMMAND]
 ```
 
-### Available Modes
+### Available Options
 
-| Mode | Description |
-|------|-------------|
-| `rag` | Enable Retrieval Augmented Generation features |
+| Option | Description |
+|--------|-------------|
+| `--rag` | Enable Retrieval Augmented Generation features |
+| `--debug` | Enable debug mode with detailed logging |
+| `--help`, `-h` | Show help information |
 
 ### Available Commands
 
 | Command | Description |
 |---------|-------------|
-| `start` | Start the default interface (same as no command) |
-| `quiet` | Start the quiet interface (recommended, suppresses debug output) |
 | `download` | Download models from HuggingFace |
 | `samples` | Download sample models for testing |
-| `help` | Show help information |
 
 ### Examples
 
 ```bash
-./llm.sh                # Standard interface
-./llm.sh quiet          # Quiet interface (recommended)
-./llm.sh rag            # Standard interface with RAG features
-./llm.sh rag quiet      # Quiet interface with RAG features
+./llm.sh                        # Standard interface
+./llm.sh --rag                  # Enable RAG features
+./llm.sh --debug                # Enable debug mode with detailed logs
+./llm.sh --rag --debug          # Enable both RAG and debug features
+./llm.sh download               # Download models
 ```
-
-### Legacy Commands
-
-These commands are maintained for backward compatibility but all redirect to the quiet interface:
-
-- `flask`: Originally launched a Flask-based interface
-- `simple`: Originally launched a simple HTTP interface
-- `minimal`: Originally launched a minimal interface
 
 ## Using the Web Interface
 
@@ -143,7 +135,7 @@ RAG enhances the LLM by allowing it to reference your own documents when generat
 Start the interface with RAG support:
 
 ```bash
-./llm.sh rag
+./llm.sh --rag
 ```
 
 ### Project Management
