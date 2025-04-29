@@ -778,7 +778,6 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 # Import and initialize the RAG API handler
                 try:
                     # Ensure the rag_support package is properly loaded
-                    import sys
                     import importlib
                     
                     # Make sure the rag_support package is in the path
@@ -955,7 +954,6 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                 # Import and initialize the RAG API handler
                 try:
                     # Ensure the rag_support package is properly loaded
-                    import sys
                     import importlib
                     
                     # Make sure the rag_support package is in the path
@@ -1040,17 +1038,19 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
             context_docs = request_data.get('context_docs', [])
             context_content = ""
             context_docs_info = []
-            max_context_tokens = 1200  # Reserve tokens for system prompt, user message, and response
             
-            # Helper function to estimate token count
-            def estimate_tokens(text):
-                # Roughly 4 chars per token for English text
-                return len(text) // 4
-            
-            # If we have context docs and RAG is enabled, load the document content
+            # If we have context docs and RAG is enabled, load the document content using smart context manager
             if RAG_ENABLED and context_docs:
                 try:
+                    # Import the smart context manager and project manager
                     from rag_support.utils import project_manager
+                    
+                    try:
+                        from rag_support.utils.context_manager import context_manager
+                    except ImportError:
+                        # Fallback to old method if context_manager isn't available
+                        print("WARNING: Smart context manager not available, using legacy context handling")
+                        context_manager = None
                     
                     # Find the project ID from the context docs or headers
                     project_id = request_data.get('project_id')
@@ -1072,63 +1072,95 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                     
                     # Load documents if we have a project ID
                     if project_id:
-                        all_docs = []
-                        # First pass: load all documents and calculate token counts
-                        for doc_id in context_docs:
-                            doc = project_manager.get_document(project_id, doc_id)
-                            if doc:
-                                doc_content = doc.get('content', '')
-                                doc_title = doc.get('title', 'Document')
-                                doc_tokens = estimate_tokens(doc_content)
-                                all_docs.append({
-                                    'id': doc_id,
-                                    'title': doc_title,
-                                    'content': doc_content,
-                                    'tokens': doc_tokens
-                                })
-                        
-                        # Sort by relevance (or token count for now)
-                        all_docs.sort(key=lambda x: x['tokens'])
-                        
-                        # Second pass: add documents until we hit the token limit
-                        current_tokens = 0
-                        for doc in all_docs:
-                            # Check if adding this document would exceed our token limit
-                            if current_tokens + doc['tokens'] > max_context_tokens:
-                                # If this is the first document, we need to truncate it
-                                if len(context_docs_info) == 0:
-                                    # Take as much as we can from this document
-                                    max_chars = max_context_tokens * 4
-                                    truncated_content = doc['content'][:max_chars] + "...[truncated]"
-                                    context_content += f"## {doc['title']}\n\n{truncated_content}\n\n"
-                                    context_docs_info.append({
-                                        'id': doc['id'],
-                                        'title': doc['title'],
-                                        'tokens': estimate_tokens(truncated_content),
-                                        'truncated': True
-                                    })
-                                    current_tokens += estimate_tokens(truncated_content)
-                                break
+                        if context_manager:
+                            # Use the smart context manager
+                            # Initialize with model information
+                            context_manager.model_path = model_path
                             
-                            # Add this document to our context
-                            context_content += f"## {doc['title']}\n\n{doc['content']}\n\n"
-                            context_docs_info.append({
-                                'id': doc['id'],
-                                'title': doc['title'],
-                                'tokens': doc['tokens'],
-                                'truncated': False
-                            })
-                            current_tokens += doc['tokens']
-                        
-                        # Add context to system message
-                        if context_content:
-                            if system_message:
-                                system_message += "\n\n"
-                            system_message += "Use the following information to answer the user's question:\n\n" + context_content
+                            # Prepare system prompt with smart context management
+                            system_message_with_context, context_docs_info = context_manager.prepare_system_prompt_with_context(
+                                project_id=project_id,
+                                document_ids=context_docs,
+                                query=message,
+                                base_system_prompt=system_message,
+                                message_history=message_history
+                            )
                             
-                            print(f"Added {len(context_docs_info)} documents to context. Total tokens: {current_tokens}")
+                            # Update the system message
+                            system_message = system_message_with_context
+                            
+                            # Log what documents were included
+                            total_tokens = sum(doc.get('tokens', 0) for doc in context_docs_info)
+                            print(f"Added {len(context_docs_info)} documents to context. Total tokens: {total_tokens}")
                             for doc in context_docs_info:
-                                print(f"- {doc['title']}: {doc['tokens']} tokens {'(truncated)' if doc.get('truncated') else ''}")
+                                print(f"- {doc['title']}: {doc['tokens']} tokens {'(truncated)' if doc.get('truncated', False) else ''}")
+                        else:
+                            # Legacy context handling (simplified and safer)
+                            all_docs = []
+                            # Helper function to estimate token count
+                            def estimate_tokens(text):
+                                # Roughly 4 chars per token for English text
+                                return len(text) // 4
+                                
+                            # Set a conservative max context token limit
+                            max_context_tokens = 800  # Conservative value to prevent model overload
+                            
+                            # First pass: load all documents and calculate token counts
+                            for doc_id in context_docs:
+                                doc = project_manager.get_document(project_id, doc_id)
+                                if doc:
+                                    doc_content = doc.get('content', '')
+                                    doc_title = doc.get('title', 'Document')
+                                    doc_tokens = estimate_tokens(doc_content)
+                                    all_docs.append({
+                                        'id': doc_id,
+                                        'title': doc_title,
+                                        'content': doc_content,
+                                        'tokens': doc_tokens
+                                    })
+                            
+                            # Sort by token count (smallest first to fit more documents)
+                            all_docs.sort(key=lambda x: x['tokens'])
+                            
+                            # Second pass: add documents until we hit the token limit
+                            current_tokens = 0
+                            for doc in all_docs:
+                                # Check if adding this document would exceed our token limit
+                                if current_tokens + doc['tokens'] > max_context_tokens:
+                                    # If this is the first document, we need to truncate it
+                                    if len(context_docs_info) == 0:
+                                        # Take as much as we can from this document
+                                        max_chars = max_context_tokens * 4
+                                        truncated_content = doc['content'][:max_chars] + "...[truncated]"
+                                        context_content += f"## {doc['title']}\n\n{truncated_content}\n\n"
+                                        context_docs_info.append({
+                                            'id': doc['id'],
+                                            'title': doc['title'],
+                                            'tokens': estimate_tokens(truncated_content),
+                                            'truncated': True
+                                        })
+                                        current_tokens += estimate_tokens(truncated_content)
+                                    break
+                                
+                                # Add this document to our context
+                                context_content += f"## {doc['title']}\n\n{doc['content']}\n\n"
+                                context_docs_info.append({
+                                    'id': doc['id'],
+                                    'title': doc['title'],
+                                    'tokens': doc['tokens'],
+                                    'truncated': False
+                                })
+                                current_tokens += doc['tokens']
+                            
+                            # Add context to system message
+                            if context_content:
+                                if system_message:
+                                    system_message += "\n\n"
+                                system_message += "Use the following information to answer the user's question:\n\n" + context_content
+                                
+                                print(f"Added {len(context_docs_info)} documents to context. Total tokens: {current_tokens}")
+                                for doc in context_docs_info:
+                                    print(f"- {doc['title']}: {doc['tokens']} tokens {'(truncated)' if doc.get('truncated') else ''}")
                 except ImportError as e:
                     print(f"Error loading context: {e}")
                     traceback.print_exc()
@@ -1138,7 +1170,6 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
             
             # Try to use the inference module
             try:
-                sys.path.append(str(BASE_DIR / "scripts"))
                 # Make sure the scripts directory is in the path
                 scripts_dir = str(BASE_DIR / "scripts")
                 if scripts_dir not in sys.path:
@@ -1274,6 +1305,9 @@ if __name__ == '__main__':
             print(f"Some RAG features may not work correctly.")
             if DEBUG_MODE:
                 traceback.print_exc()
+    
+    # Enable address reuse to prevent port binding issues
+    socketserver.TCPServer.allow_reuse_address = True
     
     # Try to find an available port
     for port in range(START_PORT, END_PORT + 1):
