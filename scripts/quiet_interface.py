@@ -13,6 +13,7 @@ import webbrowser
 import time
 import logging
 import traceback
+import html
 
 # Error handling utilities
 class ErrorHandler:
@@ -149,45 +150,42 @@ except Exception as e:
 def render_template(template_name, **kwargs):
     """Render a template with the given kwargs
     
-    Falls back to the static HTML template if Jinja2 is not available or if
-    the template file is not found.
+    Throws exceptions if the template cannot be found or rendered.
+    No fallbacks - errors must be transparent.
     """
     if not template_env:
-        # Log warning about using fallback HTML
-        print("Warning: Jinja2 not available, using fallback HTML template")
-        return get_fallback_html(RAG_ENABLED)
+        # Log error about missing Jinja2 - this is a critical error
+        error_msg = "Critical Error: Jinja2 is required but not available. Install with: pip install jinja2"
+        logging.error(error_msg)
+        raise ImportError(error_msg)
     
     try:
         # Try to load the template
         template = template_env.get_template(template_name)
         return template.render(**kwargs)
     except jinja2.exceptions.TemplateNotFound:
-        print(f"Warning: Template {template_name} not found, using fallback HTML")
-        return get_fallback_html(RAG_ENABLED)
+        # Log error about missing template - this is a critical error
+        error_msg = f"Critical Error: Template {template_name} not found"
+        logging.error(error_msg)
+        raise ValueError(error_msg)
     except Exception as e:
-        print(f"Error rendering template {template_name}: {e}")
+        # Log other rendering errors - this is a critical error
+        logging.error(f"Error rendering template {template_name}: {e}")
         if DEBUG_MODE:
             traceback.print_exc()
-        return get_fallback_html(RAG_ENABLED)
+        raise
 
-# Fallback HTML template for when templates or Jinja2 are not available
+# [DEPRECATED] - This fallback system is being phased out as part of HTML interface implementation
+# No fallbacks are allowed anymore - templates are required and errors must be transparent
+# This function is kept temporarily for reference only and will be removed in a future update
 def get_fallback_html(rag_enabled=False):
-    """Get the fallback HTML template
+    """[DEPRECATED] - Fallback HTML template function
     
-    This is used when Jinja2 is not available or if template files are not found.
+    This function is deprecated and will be removed in a future update.
+    All templates must now be properly implemented with no fallbacks.
     """
-    if rag_enabled and RAG_ENABLED:
-        try:
-            from rag_support.ui_extensions import get_extended_html_template
-            return get_extended_html_template()
-        except ImportError:
-            print("Error loading RAG UI extensions, using standard template")
-            return HTML_TEMPLATE
-        except Exception as e:
-            print(f"Error applying RAG extensions: {e}")
-            return HTML_TEMPLATE
-    else:
-        return HTML_TEMPLATE
+    logging.error("Deprecated fallback HTML template function called - templates are now required")
+    raise NotImplementedError("Fallback HTML templates are deprecated - all templates must be properly implemented")
 
 # HTML template for the main page (fallback if templates are unavailable)
 HTML_TEMPLATE = """
@@ -812,27 +810,44 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
         
         # Standard request handling
         if parsed_path.path == '/' or parsed_path.path == '/index.html':
-            self.send_response(200)
-            self.send_header('Content-type', 'text/html')
-            self.end_headers()
-            
-            # Render template or use fallback
             try:
-                if template_env:
-                    # Use Jinja2 templates
-                    html = render_template("layouts/main.html", rag_enabled=RAG_ENABLED)
-                    print("Using Jinja2 templates")
-                else:
-                    # Use fallback template with extension points
-                    html = get_fallback_html(RAG_ENABLED)
-                    print("Using fallback HTML template")
+                # Render template - no fallback allowed
+                html = render_template("layouts/main.html", rag_enabled=RAG_ENABLED)
                 
-                # Write the HTML response
+                self.send_response(200)
+                self.send_header('Content-type', 'text/html')
+                self.end_headers()
                 self.wfile.write(html.encode('utf-8'))
+                
+                print("Rendered main template successfully")
             except Exception as e:
+                # Create a basic error page for template rendering failures
                 error_context = "Rendering main page template"
+                error_message = ErrorHandler.format_error(e, include_traceback=DEBUG_MODE)
                 ErrorHandler.log_error(e, error_context, include_traceback=DEBUG_MODE)
-                self.send_error(500, f"Error rendering template: {str(e)}")
+                
+                # Send a proper error response with a basic HTML error template
+                self.send_response(500)
+                self.send_header('Content-type', 'text/html')
+                self.end_headers()
+                
+                # Import html module here to avoid UnboundLocalError
+                import html as html_module
+                
+                error_html = f"""
+                <!DOCTYPE html>
+                <html>
+                <head><title>Template Error</title></head>
+                <body style="font-family: system-ui, sans-serif; margin: 2rem; line-height: 1.6;">
+                    <h1>Template Rendering Error</h1>
+                    <p>There was an error rendering the template:</p>
+                    <pre style="background: #f5f5f5; padding: 1rem; border-radius: 4px; overflow: auto;">{html_module.escape(error_message)}</pre>
+                    <p>Please make sure all template files are available and Jinja2 is installed.</p>
+                    <p><a href="javascript:location.reload()">Reload page</a></p>
+                </body>
+                </html>
+                """
+                self.wfile.write(error_html.encode('utf-8'))
         elif parsed_path.path == '/api/models':
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
@@ -840,6 +855,64 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
             
             models = find_models()
             self.wfile.write(json.dumps({"models": models}).encode('utf-8'))
+        # Handle static assets
+        elif parsed_path.path.startswith('/assets/'):
+            # Extract the file path from the URL
+            file_path = parsed_path.path[1:]  # Remove leading slash
+            full_path = TEMPLATES_DIR / file_path
+            
+            print(f"Trying to serve static asset: {file_path}")
+            print(f"Full path: {full_path}")
+            
+            # Check if the file exists
+            if not full_path.is_file():
+                print(f"Asset not found: {full_path}")
+                # Try alternate path - some files may be directly under the assets folder
+                if file_path.endswith('.css'):
+                    alternate_path = ASSETS_DIR / "css" / Path(file_path).name
+                    if alternate_path.is_file():
+                        full_path = alternate_path
+                    else:
+                        print(f"CSS not found at alternate location: {alternate_path}")
+                elif file_path.endswith('.js'):
+                    alternate_path = ASSETS_DIR / "js" / Path(file_path).name
+                    if alternate_path.is_file():
+                        full_path = alternate_path
+                    else:
+                        print(f"JS not found at alternate location: {alternate_path}")
+                        
+            # Final check if the file exists
+            if not full_path.is_file():
+                self.send_error(404, f"Asset not found: {parsed_path.path}")
+                return
+                
+            # Determine the MIME type
+            content_type = 'text/plain'
+            if file_path.endswith('.css'):
+                content_type = 'text/css'
+            elif file_path.endswith('.js'):
+                content_type = 'application/javascript'
+            elif file_path.endswith('.png'):
+                content_type = 'image/png'
+            elif file_path.endswith('.jpg') or file_path.endswith('.jpeg'):
+                content_type = 'image/jpeg'
+            elif file_path.endswith('.svg'):
+                content_type = 'image/svg+xml'
+                
+            # Send the file content
+            try:
+                with open(full_path, 'rb') as f:
+                    content = f.read()
+                    
+                self.send_response(200)
+                self.send_header('Content-type', content_type)
+                self.send_header('Content-Length', str(len(content)))
+                self.end_headers()
+                self.wfile.write(content)
+            except Exception as e:
+                error_context = f"Serving static asset {file_path}"
+                ErrorHandler.log_error(e, error_context, include_traceback=DEBUG_MODE)
+                self.send_error(500, f"Error serving asset: {str(e)}")
         else:
             self.send_error(404, "File not found")
     

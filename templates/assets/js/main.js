@@ -1,12 +1,21 @@
-<script>
-// Initialize chat history
+/**
+ * Main script for the LLM Interface
+ * This script provides legacy support for older code
+ * while the transition to the component system is completed
+ */
+
+// Initialize global variables for backward compatibility
 let chatHistory = [];
 let currentChatId = Date.now().toString();
 
-// Fetch models on page load
+// Only run initialization after DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
-    // Fetch models
-    fetch('/api/models')
+    console.log("Legacy main script loaded");
+    
+    // Initialize model list
+    function initModels() {
+        // Legacy direct API call for model fetching
+        fetch('/api/models')
         .then(response => response.json())
         .then(data => {
             const modelList = document.getElementById('modelList');
@@ -41,19 +50,43 @@ document.addEventListener('DOMContentLoaded', function() {
         .catch(error => {
             document.getElementById('modelList').innerHTML = 'Error loading models: ' + error.message;
         });
+    }
     
-    // Set up event listeners
-    document.getElementById('sendBtn').addEventListener('click', sendMessage);
-    document.getElementById('newChatBtn').addEventListener('click', newChat);
-    document.getElementById('exportChatBtn').addEventListener('click', exportChat);
-    
-    // Allow pressing Enter to send message
-    document.getElementById('userInput').addEventListener('keydown', function(e) {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            sendMessage();
+    // Only initialize legacy code if the component system isn't available
+    if (typeof window.LLM === 'undefined' || typeof window.LLM.Components === 'undefined') {
+        console.warn("Component system not detected, using legacy initialization");
+        initModels();
+        
+        // Set up event listeners if elements exist
+        const sendBtn = document.getElementById('sendBtn');
+        const newChatBtn = document.getElementById('newChatBtn');
+        const exportChatBtn = document.getElementById('exportChatBtn');
+        const userInput = document.getElementById('userInput');
+        
+        if (sendBtn && typeof sendMessage === 'function') {
+            sendBtn.addEventListener('click', sendMessage);
         }
-    });
+        
+        if (newChatBtn && typeof newChat === 'function') {
+            newChatBtn.addEventListener('click', newChat);
+        }
+        
+        if (exportChatBtn && typeof exportChat === 'function') {
+            exportChatBtn.addEventListener('click', exportChat);
+        }
+        
+        // Allow pressing Enter to send message
+        if (userInput && typeof sendMessage === 'function') {
+            userInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                }
+            });
+        }
+    } else {
+        console.log("Component system detected, skipping legacy initialization");
+    }
 });
 
 // Load chat history from localStorage if available
@@ -274,4 +307,3 @@ function exportChat() {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 }
-</script>

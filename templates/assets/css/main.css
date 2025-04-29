@@ -1,4 +1,3 @@
-<style>
 body {
     font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     line-height: 1.6;
@@ -18,6 +17,7 @@ body {
 /* With RAG enabled, we have a sidebar */
 body[data-rag-enabled="true"] .interface-container {
     grid-template-columns: 250px 1fr;
+    gap: 1.5rem;
 }
 
 /* Collapsible sidebar */
@@ -27,7 +27,14 @@ body[data-rag-enabled="true"] .interface-container {
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     padding: 1rem;
     position: relative;
-    transition: width 0.3s ease;
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    height: calc(100vh - 4rem);
+    max-height: 800px;
+    position: sticky;
+    top: 2rem;
 }
 
 .sidebar-collapsed .sidebar {
@@ -46,6 +53,441 @@ body[data-rag-enabled="true"] .interface-container {
     color: #666;
     padding: 0;
     z-index: 10;
+}
+
+.sidebar-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+}
+
+.project-selector {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.project-selector select {
+    flex: 1;
+    margin-bottom: 0;
+}
+
+.action-button {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.85rem;
+}
+
+.action-bar {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.spacer {
+    flex: 1;
+}
+
+.search-container {
+    position: relative;
+    margin-bottom: 0.5rem;
+}
+
+.search-input {
+    width: 100%;
+    padding: 0.5rem;
+    padding-right: 2rem;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+    font-size: 0.9rem;
+}
+
+.clear-search {
+    position: absolute;
+    right: 0.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #888;
+    font-size: 1.1rem;
+    padding: 0;
+}
+
+.document-list {
+    flex: 1;
+    overflow-y: auto;
+    border: 1px solid #eee;
+    border-radius: 4px;
+    background: #fafafa;
+    padding: 0.5rem;
+}
+
+.document-list ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.document-item {
+    padding: 0.6rem;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.document-item:last-child {
+    border-bottom: none;
+}
+
+.document-item:hover {
+    background: #f0f7ff;
+}
+
+.document-selector {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1;
+}
+
+.document-name {
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+
+.document-actions {
+    display: flex;
+    gap: 0.3rem;
+}
+
+.preview-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #1890ff;
+    font-size: 1rem;
+    padding: 0.3rem;
+    border-radius: 3px;
+}
+
+.preview-btn:hover {
+    background: #e6f7ff;
+}
+
+.empty-state {
+    color: #888;
+    font-size: 0.9rem;
+    text-align: center;
+    padding: 1rem;
+}
+
+/* Context bar styles */
+.context-bar {
+    background: #f5f7fa;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border: 1px solid #e1e4e8;
+}
+
+.context-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.context-header h3 {
+    margin: 0;
+    font-size: 1rem;
+}
+
+.context-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+}
+
+.clear-context-btn {
+    padding: 0.3rem 0.6rem;
+    font-size: 0.8rem;
+}
+
+.context-items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    min-height: 30px;
+}
+
+.context-item {
+    background: #e6f7ff;
+    border-radius: 6px;
+    padding: 0.3rem 0.5rem;
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    border: 1px solid #91d5ff;
+}
+
+.context-item-title {
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.context-item-remove {
+    cursor: pointer;
+    color: #999;
+    font-size: 1rem;
+}
+
+.context-item-remove:hover {
+    color: #666;
+}
+
+.context-stats {
+    margin-top: 0.8rem;
+    font-size: 0.75rem;
+    color: #666;
+}
+
+.token-usage {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.token-bar {
+    height: 6px;
+    background: #f0f0f0;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.token-used {
+    height: 100%;
+    background: #1890ff;
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+.token-label {
+    display: flex;
+    justify-content: flex-end;
+}
+
+/* Token usage colors */
+.token-low {
+    background: #52c41a;
+}
+
+.token-medium {
+    background: #faad14;
+}
+
+.token-high {
+    background: #f5222d;
+}
+
+/* Toggle switch styling */
+.toggle-switch {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.toggle-switch label {
+    font-size: 0.8rem;
+    color: #666;
+}
+
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 30px;
+    height: 16px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: .2s;
+    border-radius: 16px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 12px;
+    width: 12px;
+    left: 2px;
+    bottom: 2px;
+    background-color: white;
+    transition: .2s;
+    border-radius: 50%;
+}
+
+input:checked + .slider {
+    background-color: #1890ff;
+}
+
+input:checked + .slider:before {
+    transform: translateX(14px);
+}
+
+/* Model selector styles */
+.model-selector {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.model-select-container,
+.system-prompt-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.model-select-container label,
+.system-prompt-container label {
+    font-weight: bold;
+    font-size: 0.9rem;
+}
+
+.prompt-tips {
+    font-size: 0.8rem;
+    color: #666;
+    margin-top: 0.3rem;
+}
+
+/* Project list styles */
+.project-list {
+    max-height: 200px;
+    overflow-y: auto;
+    margin: 0.8rem 0;
+    border: 1px solid #eee;
+    border-radius: 4px;
+    background: #fafafa;
+}
+
+.project-list-items {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.project-item {
+    padding: 0.8rem;
+    border-bottom: 1px solid #eee;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.project-item:hover {
+    background: #f0f7ff;
+}
+
+.project-item.selected {
+    background: #e6f7ff;
+    border-left: 3px solid #1890ff;
+}
+
+.project-name {
+    font-weight: 500;
+}
+
+.document-count {
+    font-size: 0.8rem;
+    color: #888;
+    background: #f0f0f0;
+    padding: 0.2rem 0.4rem;
+    border-radius: 10px;
+}
+
+.token-counter {
+    font-size: 0.8rem;
+    color: #666;
+    margin-top: 0.5rem;
+    text-align: center;
+    padding: 0.3rem;
+    background: #f5f5f5;
+    border-radius: 4px;
+}
+
+/* Document preview styles */
+.document-preview {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 600px;
+    max-width: 90vw;
+    max-height: 80vh;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    display: flex;
+    flex-direction: column;
+    z-index: 1000;
+    display: none;
+}
+
+.preview-header {
+    padding: 1rem;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.preview-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+.preview-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #999;
+    padding: 0;
+    margin: 0;
+    line-height: 1;
+}
+
+.preview-content {
+    padding: 1rem;
+    overflow-y: auto;
+    flex: 1;
+    max-height: 400px;
+}
+
+.preview-actions {
+    padding: 1rem;
+    border-top: 1px solid #eee;
+    display: flex;
+    justify-content: flex-end;
 }
 
 .card {
@@ -250,4 +692,3 @@ select {
 .secondary-btn:hover {
     background-color: #e9e9e9;
 }
-</style>

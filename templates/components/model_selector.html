@@ -1,4 +1,18 @@
-<select id="modelSelect">
-    <option value="">Select a model</option>
-</select>
-<textarea id="systemInput" placeholder="System message (optional)" style="height: 60px;"></textarea>
+<div class="model-selector">
+    <div class="model-select-container">
+        <label for="modelSelect">Model:</label>
+        <select id="modelSelect">
+            <option value="">Select a model</option>
+        </select>
+    </div>
+    
+    <div class="system-prompt-container">
+        <label for="systemInput">System Prompt:</label>
+        <textarea id="systemInput" placeholder="Instructions for the model (optional)" style="height: 80px;"></textarea>
+        <div class="prompt-tips">
+            <small>Use the system prompt to set the behavior or knowledge context for the model.</small>
+        </div>
+    </div>
+</div>
+
+<!-- Styles moved to main.css -->

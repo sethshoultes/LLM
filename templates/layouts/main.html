@@ -6,7 +6,9 @@
     <title>LLM Interface</title>
     <!-- CSS -->
     {% block styles %}
-    {% include "assets/css/main.css" %}
+    <style>
+        {% include "assets/css/main.css" %}
+    </style>
     {% endblock %}
     
     <!-- Extension point for HEAD -->
@@ -61,7 +63,68 @@
     
     <!-- JavaScript -->
     {% block scripts %}
-    {% include "assets/js/main.js" %}
+    <!-- First load the API client -->
+    <script>
+        {% include "assets/js/api.js" %}
+    </script>
+    
+    <!-- Then load component controllers -->
+    <script>
+        {% include "assets/js/components.js" %}
+    </script>
+    
+    <!-- Finally load the legacy compatibility script -->
+    <script>
+        {% include "assets/js/main.js" %}
+    </script>
+    
+    <!-- Initialization script -->
+    <script>
+    // Simple component initialization wrapper
+    (function() {
+        // Wait until DOM is fully loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log("Initializing components");
+            
+            // Only initialize if namespace exists
+            if (typeof window.LLM === 'undefined' || typeof window.LLM.Components === 'undefined') {
+                console.error("LLM components not found - initialization skipped");
+                return;
+            }
+            
+            try {
+                // Initialize model selector
+                if (window.LLM.Components.ModelSelector) {
+                    window.LLM.Components.ModelSelector.init();
+                }
+                
+                // Initialize chat interface
+                if (window.LLM.Components.ChatInterface) {
+                    window.LLM.Components.ChatInterface.init();
+                }
+                
+                // Initialize parameter controls
+                if (window.LLM.Components.ParameterControls) {
+                    window.LLM.Components.ParameterControls.init();
+                }
+                
+                // Initialize context manager
+                if (window.LLM.Components.ContextManager) {
+                    window.LLM.Components.ContextManager.init();
+                }
+                
+                // Initialize RAG sidebar if enabled
+                if (document.body.getAttribute('data-rag-enabled') && window.LLM.Components.RAGSidebar) {
+                    window.LLM.Components.RAGSidebar.init();
+                }
+                
+                console.log("Components initialized successfully");
+            } catch (error) {
+                console.error("Error during component initialization:", error);
+            }
+        });
+    })();
+    </script>
     {% endblock %}
     
     <!-- Extension point for SCRIPTS -->
