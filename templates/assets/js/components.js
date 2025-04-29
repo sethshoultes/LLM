@@ -520,6 +520,7 @@ LLM.Components = {
         currentProject: null,
         selectedDocuments: [],
         previewedDocument: null,
+        documents: [],  // Store loaded documents for the current project
         
         // Initialize the component
         init: function() {
@@ -946,22 +947,19 @@ LLM.Components = {
             
             tokenCounter.innerHTML = 'Calculating tokens...';
             
-            API.RAG.getTokenInfo(this.currentProject)
-                .then(data => {
-                    if (data.token_counts) {
-                        let totalTokens = 0;
-                        this.selectedDocuments.forEach(docId => {
-                            if (data.token_counts[docId]) {
-                                totalTokens += data.token_counts[docId];
-                            }
-                        });
-                        
-                        tokenCounter.innerHTML = `Selected: ${this.selectedDocuments.length} documents, ${totalTokens} tokens`;
+            // For demo purposes, calculate tokens from local documents
+            // In a real implementation, this would make an API call
+            setTimeout(() => {
+                let totalTokens = 0;
+                this.selectedDocuments.forEach(docId => {
+                    const doc = this.documents.find(d => d.id === docId);
+                    if (doc && doc.tokens) {
+                        totalTokens += doc.tokens;
                     }
-                })
-                .catch(error => {
-                    tokenCounter.innerHTML = 'Error calculating tokens';
                 });
+                
+                tokenCounter.innerHTML = `Selected: ${this.selectedDocuments.length} documents, ${totalTokens} tokens`;
+            }, 300);
         },
         
         // Get currently selected documents
