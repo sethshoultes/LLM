@@ -1,10 +1,28 @@
 #!/usr/bin/env python3
-# context_manager.py - Smart context management for RAG system
+"""
+Context management module for the LLM Platform.
+
+Provides smart context management for RAG systems with token budgeting 
+and adaptive document selection.
+"""
 
 import os
 import logging
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional, Tuple, Union
+
+# Import from core modules
+from core.logging import get_logger
+from core.utils import timer
+
+# Import RAG types but defer actual import to avoid circular imports
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from rag.documents import Document, DocumentCollection
+    from rag.search import SearchEngine, SearchResult
+
+# Get logger for this module
+logger = get_logger("rag_support.context_manager")
 
 # Import BASE_DIR from rag_support
 try:
@@ -17,13 +35,12 @@ except ImportError:
     # Use environment variable if available
     BASE_DIR = Path(os.environ.get("LLM_BASE_DIR", str(BASE_DIR)))
 
-# Import search engine
+# Import project manager for document access
 try:
-    from rag_support.utils.search import search_engine
+    from rag_support.utils.project_manager import project_manager
 except ImportError:
-    search_engine = None
-
-logger = logging.getLogger("rag_context_manager")
+    logger.error("Failed to import project_manager - context functionality will be limited")
+    project_manager = None
 
 # Constants
 DEFAULT_TOKENS_PER_CHAR = 0.25  # Approximation of tokens per character (1 token ~= 4 chars)
@@ -33,10 +50,16 @@ TOKEN_RESERVE_RATIO = 0.15      # Percentage of tokens to reserve for the respon
 MIN_RESERVED_TOKENS = 256       # Minimum number of tokens to reserve for response
 
 class SmartContextManager:
-    """Manages context for RAG systems with adaptive token allocation"""
+    """
+    Manages context for RAG systems with adaptive token allocation.
+    
+    Handles intelligent document selection, token budgeting, and
+    context formatting for optimal RAG performance.
+    """
     
     def __init__(self, model_path: str = None):
-        """Initialize the context manager
+        """
+        Initialize the context manager.
         
         Args:
             model_path: Path to the model (used to determine model size and capabilities)
@@ -45,8 +68,11 @@ class SmartContextManager:
         self.model_context_window = self._determine_context_window(model_path)
         self.use_smart_context = os.environ.get("LLM_RAG_SMART_CONTEXT") == "1"
         
+        logger.debug(f"Initialized SmartContextManager with context window: {self.model_context_window}")
+    
     def _determine_context_window(self, model_path: str) -> int:
-        """Determine the context window size based on model path
+        """
+        Determine the context window size based on model path.
         
         Args:
             model_path: Path to the model file
@@ -58,21 +84,26 @@ class SmartContextManager:
         context_window = DEFAULT_CONTEXT_WINDOW
         
         if model_path:
-            model_path_lower = model_path.lower()
+            model_path_lower = str(model_path).lower()
             
-            # Check model size markers in the path
-            if any(marker in model_path_lower for marker in ["13b", "70b", "7b"]):
-                # These are larger models that can handle more context
-                context_window = LARGE_CONTEXT_WINDOW
+            # Large models
+            if any(marker in model_path_lower for marker in ["70b", "claude"]):
+                context_window = 8192  # Very large models
                 
-            # Small models should use the default context window
-            if any(marker in model_path_lower for marker in ["tiny", "small", "1.1b", "1b"]):
-                context_window = DEFAULT_CONTEXT_WINDOW
-                
-        return context_window
+            # Medium-sized models
+            elif any(marker in model_path_lower for marker in ["13b", "mistral", "7b", "llama2"]):
+                context_window = LARGE_CONTEXT_WINDOW  # 4096 tokens
+            
+            # Small models
+            elif any(marker in model_path_lower for marker in ["tiny", "small", "1.1b", "1b"]):
+                context_window = DEFAULT_CONTEXT_WINDOW  # 2048 tokens
         
+        return context_window
+    
+    @timer
     def estimate_tokens(self, text: str) -> int:
-        """Estimate the number of tokens in a text string
+        """
+        Estimate the number of tokens in a text string.
         
         Args:
             text: The text to estimate tokens for
@@ -82,12 +113,19 @@ class SmartContextManager:
         """
         if not text:
             return 0
-            
-        # Simple char-based approximation
-        return max(1, int(len(text) * DEFAULT_TOKENS_PER_CHAR))
         
+        # Import tokenization utilities if available
+        try:
+            from core.utils import estimate_tokens
+            return estimate_tokens(text)
+        except ImportError:
+            # Simple char-based approximation as fallback
+            return max(1, int(len(text) * DEFAULT_TOKENS_PER_CHAR))
+    
+    @timer
     def estimate_history_tokens(self, message_history: List[Dict[str, Any]]) -> int:
-        """Estimate tokens used by conversation history
+        """
+        Estimate tokens used by conversation history.
         
         Args:
             message_history: List of conversation messages
@@ -97,7 +135,7 @@ class SmartContextManager:
         """
         if not message_history:
             return 0
-            
+        
         total_tokens = 0
         for message in message_history:
             content = message.get('content', '')
@@ -107,15 +145,18 @@ class SmartContextManager:
             role_prefix = len(role) + 2 if role else 0
             
             total_tokens += self.estimate_tokens(content) + role_prefix
-            
-        # Add some overhead for formatting
-        total_tokens += len(message_history) * 5
-        return total_tokens
         
+        # Add overhead for formatting (message separators, etc.)
+        total_tokens += len(message_history) * 5
+        
+        return total_tokens
+    
+    @timer
     def calculate_available_context_tokens(self, 
                                           message_history: List[Dict[str, Any]], 
                                           system_message: str = "") -> int:
-        """Calculate tokens available for RAG context
+        """
+        Calculate tokens available for RAG context.
         
         Args:
             message_history: Conversation history
@@ -140,19 +181,21 @@ class SmartContextManager:
         
         # Log token allocation
         logger.info(f"Token allocation: {available_tokens} available for RAG context")
-        logger.info(f"  Context window: {self.model_context_window}")
-        logger.info(f"  History: {history_tokens}")
-        logger.info(f"  System: {system_tokens}")
-        logger.info(f"  Reserved: {reserve_tokens}")
+        logger.debug(f"  Context window: {self.model_context_window}")
+        logger.debug(f"  History: {history_tokens}")
+        logger.debug(f"  System: {system_tokens}")
+        logger.debug(f"  Reserved: {reserve_tokens}")
         
         return available_tokens
     
+    @timer
     def select_and_format_documents(self, 
                                   project_id: str, 
                                   document_ids: List[str], 
                                   query: str,
                                   available_tokens: int) -> Tuple[str, List[Dict[str, Any]]]:
-        """Select and format documents to fit within token constraints
+        """
+        Select and format documents to fit within token constraints.
         
         Args:
             project_id: Project ID
@@ -163,24 +206,24 @@ class SmartContextManager:
         Returns:
             Tuple of (formatted context string, list of document info dicts)
         """
-        if not document_ids or not search_engine or available_tokens <= 0:
+        if not document_ids or not project_manager or available_tokens <= 0:
             return "", []
-            
+        
         # Get the full documents
         documents = []
         for doc_id in document_ids:
-            doc = search_engine.get_document(project_id, doc_id)
+            doc = project_manager.get_document(project_id, doc_id)
             if doc:
                 documents.append(doc)
         
         if not documents:
             return "", []
-            
+        
         # Smart document selection - if we have more docs than we can fit,
-        # we'll use the search engine to prioritize the most relevant ones
-        if len(documents) > 1 and query:
+        # we'll use the search to prioritize the most relevant ones
+        if len(documents) > 1 and query and query.strip():
             # Get search results to determine document relevance
-            search_results = search_engine.search(project_id, query)
+            search_results = project_manager.search_documents(project_id, query)
             
             # Create a mapping of doc_id to search score
             relevance_scores = {result['id']: result.get('score', 0) for result in search_results}
@@ -193,8 +236,9 @@ class SmartContextManager:
         
         # Calculate tokens for each document
         for doc in documents:
-            doc['token_estimate'] = self.estimate_tokens(doc.get('content', ''))
-            
+            doc_content = doc.get('content', '')
+            doc['token_estimate'] = self.estimate_tokens(doc_content)
+        
         # Determine how many documents we can include fully
         context_content = ""
         context_docs_info = []
@@ -271,13 +315,15 @@ class SmartContextManager:
         
         return context_content, context_docs_info
     
+    @timer
     def prepare_system_prompt_with_context(self,
                                          project_id: str,
                                          document_ids: List[str],
                                          query: str,
                                          base_system_prompt: str = "",
                                          message_history: List[Dict[str, Any]] = None) -> Tuple[str, List[Dict[str, Any]]]:
-        """Prepare a system prompt with context from documents
+        """
+        Prepare a system prompt with context from documents.
         
         Args:
             project_id: Project ID
@@ -291,7 +337,7 @@ class SmartContextManager:
         """
         if not document_ids:
             return base_system_prompt, []
-            
+        
         message_history = message_history or []
         
         # Calculate available tokens for context
@@ -316,8 +362,133 @@ class SmartContextManager:
             system_prompt += "Use the following information to answer the user's question:\n\n" + context_content
         else:
             system_prompt = base_system_prompt
-            
+        
         return system_prompt, context_docs_info
+    
+    @timer
+    def estimate_document_tokens(self, document: Dict[str, Any]) -> int:
+        """
+        Estimate tokens for a document.
+        
+        Args:
+            document: Document dictionary
+            
+        Returns:
+            Estimated token count
+        """
+        content = document.get('content', '')
+        return self.estimate_tokens(content)
+    
+    @timer
+    def format_documents_for_context(self, 
+                                  documents: List[Dict[str, Any]], 
+                                  max_tokens: int) -> Tuple[str, List[Dict[str, Any]]]:
+        """
+        Format a list of documents for context, fitting within max_tokens.
+        
+        Args:
+            documents: List of document dictionaries
+            max_tokens: Maximum tokens to use
+            
+        Returns:
+            Tuple of (formatted context, document info list)
+        """
+        if not documents or max_tokens <= 0:
+            return "", []
+        
+        # Calculate tokens for each document
+        for doc in documents:
+            if 'token_estimate' not in doc:
+                doc['token_estimate'] = self.estimate_document_tokens(doc)
+        
+        # Sort by relevance if score is available
+        if 'score' in documents[0]:
+            documents.sort(key=lambda doc: doc.get('score', 0), reverse=True)
+        
+        # Format documents to fit within token limit
+        formatted_context = ""
+        docs_info = []
+        current_tokens = 0
+        
+        for doc in documents:
+            doc_title = doc.get('title', 'Document')
+            doc_content = doc.get('content', '')
+            doc_tokens = doc.get('token_estimate', self.estimate_tokens(doc_content))
+            
+            # Calculate tokens for the header
+            header = f"## {doc_title}\n\n"
+            header_tokens = self.estimate_tokens(header)
+            
+            # Check if adding this document would exceed the token limit
+            if current_tokens + doc_tokens + header_tokens > max_tokens:
+                # If this is the first document, include a truncated version
+                if not docs_info:
+                    available_content_tokens = max_tokens - current_tokens - header_tokens
+                    truncated_content = self._truncate_text(doc_content, available_content_tokens)
+                    
+                    formatted_context += header + truncated_content + "\n\n"
+                    truncated_tokens = self.estimate_tokens(truncated_content)
+                    
+                    docs_info.append({
+                        'id': doc.get('id'),
+                        'title': doc_title,
+                        'tokens': truncated_tokens + header_tokens,
+                        'truncated': True
+                    })
+                    
+                    current_tokens += truncated_tokens + header_tokens
+                
+                # Stop processing more documents
+                break
+            
+            # Add full document
+            formatted_context += header + doc_content + "\n\n"
+            docs_info.append({
+                'id': doc.get('id'),
+                'title': doc_title,
+                'tokens': doc_tokens + header_tokens,
+                'truncated': False
+            })
+            
+            current_tokens += doc_tokens + header_tokens
+        
+        return formatted_context, docs_info
+    
+    def _truncate_text(self, text: str, max_tokens: int) -> str:
+        """
+        Truncate text to fit within max_tokens in a smart way.
+        
+        Args:
+            text: Text to truncate
+            max_tokens: Maximum tokens allowed
+            
+        Returns:
+            Truncated text
+        """
+        if not text:
+            return ""
+        
+        # Convert tokens to approximate character count
+        max_chars = int(max_tokens / DEFAULT_TOKENS_PER_CHAR)
+        
+        # If text is already short enough, return it as is
+        if len(text) <= max_chars:
+            return text
+        
+        # Find a good breaking point (end of sentence or paragraph)
+        breakpoint = max(
+            text[:max_chars].rfind('. '),
+            text[:max_chars].rfind('! '),
+            text[:max_chars].rfind('? '),
+            text[:max_chars].rfind('\n\n')
+        )
+        
+        # If no good breakpoint found, just cut at the character limit
+        if breakpoint == -1:
+            return text[:max_chars] + "...[truncated]"
+        else:
+            # Include the period/etc and the space
+            return text[:breakpoint + 2] + "...[truncated]"
 
 # Create default instance
 context_manager = SmartContextManager()
