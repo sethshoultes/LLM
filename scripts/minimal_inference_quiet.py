@@ -243,10 +243,11 @@ class SimpleModelManager:
                         full_prompt = f"<|user|>\n{prompt}</s>\n<|assistant|>\n"
                 # For Mistral, we use a specific format
                 elif "mistral" in model_path.lower():
+                    # Don't explicitly add <s> token here - the model's chat template will add it
                     if system_prompt:
-                        full_prompt = f"<s>[INST] {system_prompt}\n\n{prompt} [/INST]"
+                        full_prompt = f"[INST] {system_prompt}\n\n{prompt} [/INST]"
                     else:
-                        full_prompt = f"<s>[INST] {prompt} [/INST]"
+                        full_prompt = f"[INST] {prompt} [/INST]"
                 # For Llama models
                 elif "llama" in model_path.lower():
                     if system_prompt:
@@ -473,35 +474,38 @@ def format_conversation_history(self, messages, system_prompt="", model_path="")
         # Mistral format
         formatted_content = ""
         
-        # Add system prompt at the beginning if provided
-        if system_prompt:
-            formatted_content += f"<s>[INST] {system_prompt}\n\n"
-        else:
-            formatted_content += "<s>"
+        # Remove explicit start token - model's chat template will add it
+        # This prevents the "duplicate leading <s>" warning
         
         # Process messages in pairs (user + assistant)
         for i in range(0, len(messages), 2):
             user_msg = messages[i] if i < len(messages) else None
             assistant_msg = messages[i+1] if i+1 < len(messages) else None
             
+            # Add system prompt before the first user message if available
+            if i == 0 and system_prompt:
+                # For the first pair with system prompt
+                if user_msg and user_msg.get('role') == 'user':
+                    formatted_content += f"[INST] {system_prompt}\n\n{user_msg.get('content')} [/INST] "
+                    
+                    # Add assistant response if available
+                    if assistant_msg and assistant_msg.get('role') == 'assistant':
+                        formatted_content += f"{assistant_msg.get('content')} "
+                continue
+            
+            # Handle regular message pairs
             if user_msg and user_msg.get('role') == 'user':
-                if i == 0 and system_prompt:
-                    # First user message after system prompt
-                    formatted_content += f"{user_msg.get('content')} [/INST] "
-                else:
-                    # Subsequent user messages
-                    formatted_content += f"[INST] {user_msg.get('content')} [/INST] "
+                formatted_content += f"[INST] {user_msg.get('content')} [/INST] "
                 
                 # Add assistant response if available
                 if assistant_msg and assistant_msg.get('role') == 'assistant':
                     formatted_content += f"{assistant_msg.get('content')} "
         
-        # If the last message is from a user, add the closing tag
-        if messages[-1].get('role') == 'user':
-            if len(messages) == 1 and system_prompt:
-                formatted_content += f"{messages[-1].get('content')} [/INST]"
-            else:
-                formatted_content += "[INST] " + messages[-1].get('content') + " [/INST]"
+        # If the last message is from a user and wasn't handled in the loop
+        if messages[-1].get('role') == 'user' and (len(messages) % 2 == 1):
+            # Make sure we don't repeat the prompt if it was the only message
+            if len(messages) > 1 or not system_prompt:
+                formatted_content += f"[INST] {messages[-1].get('content')} [/INST]"
                 
         formatted_messages = [formatted_content]
     
@@ -597,6 +601,12 @@ def generate_with_history(model_path, messages, system_prompt="", max_tokens=512
             system_prompt=system_prompt,
             model_path=model_path
         )
+        
+        # Check for duplicate <s> tokens in Mistral models
+        if "mistral" in model_path.lower() and formatted_prompt.count("<s>") > 1:
+            print("WARNING: Detected duplicate <s> tokens in Mistral conversation history. Fixing...")
+            # Keep only the first <s> token by removing all and adding one back at the beginning
+            formatted_prompt = "<s>" + formatted_prompt.replace("<s>", "")
         
         print(f"Generating with conversation history: {formatted_prompt[:100]}...")
         
