@@ -21,6 +21,7 @@ from core.logging import get_logger
 from rag.documents import Document, DocumentCollection
 from rag.storage import FileSystemStorage
 from rag.indexer import TfidfIndex
+from rag.search import SearchEngine
 
 # Get logger for this module
 logger = get_logger("rag_support.project_manager")

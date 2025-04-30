@@ -49,5 +49,11 @@ except Exception as e:
     print(f"Warning: RAG support initialization error: {e}")
     # Don't raise an exception - allow import to continue even if initialization fails
 
-# Export BASE_DIR for other modules
-__all__ = ["__version__", "BASE_DIR"]
+# Import key modules so they're available at package level
+try:
+    from . import api_extensions
+except ImportError as e:
+    print(f"Warning: Could not import api_extensions: {e}")
+
+# Export BASE_DIR and key modules for other modules
+__all__ = ["__version__", "BASE_DIR", "api_extensions"]
