@@ -129,10 +129,10 @@ As this is an unreleased product, it must function cleanly out of the box with n
 
 | Task ID | Description | Dependencies | Assignee | Status | Updated |
 |---------|-------------|--------------|----------|--------|---------|
-| 4.1.1 | Create integration tests for core + models | 1.2.8 | | Not Started | |
-| 4.1.2 | Implement integration tests for rag components | 2.3.7 | | Not Started | |
+| 4.1.1 | Create integration tests for core + models | 1.2.8 | Claude | Completed | 2025-04-29 |
+| 4.1.2 | Implement integration tests for rag components | 2.3.7 | Claude | Completed | 2025-04-29 |
 | 4.1.3 | Create integration tests for web + api | 3.3.7 | | Not Started | |
-| 4.1.4 | Implement end-to-end system tests | 4.1.1-4.1.3 | | Not Started | |
+| 4.1.4 | Implement end-to-end system tests | 4.1.1-4.1.3 | Claude | In Progress | 2025-04-29 |
 
 #### 4.2 Documentation
 
@@ -207,5 +207,5 @@ This section should be updated regularly to track overall progress.
 | Phase 1 | 100% | 2025-04-29 | Core and Models implementation completed (16/16 tasks) |
 | Phase 2 | 93% | 2025-04-29 | Document Operations and Search functionality implemented (13/14 tasks complete, 1 remaining) |
 | Phase 3 | 0% | | Not started |
-| Phase 4 | 0% | | Not started |
-| Overall | 63% | 2025-04-29 | Phase 1 complete, Phase 2 at 93% completion. RAG system implementation almost complete. |
+| Phase 4 | 38% | 2025-04-29 | Integration testing for core, models, and RAG completed (3/8 tasks) |
+| Overall | 68% | 2025-04-29 | Phase 1 complete, Phase 2 at 93%, Phase 4 at 38%. Making excellent progress. |
