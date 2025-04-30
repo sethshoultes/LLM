@@ -4,4 +4,4 @@
 # Import our utilities for easy access
 
 # Provide singleton instances
-__all__ = ['ProjectManager', 'project_manager', 'SimpleSearch', 'search_engine']
+__all__ = ["ProjectManager", "project_manager", "SimpleSearch", "search_engine"]

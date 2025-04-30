@@ -25,10 +25,11 @@ BASE_DIR = Path(os.environ.get("LLM_BASE_DIR", str(BASE_DIR)))
 RAG_DIR = BASE_DIR / "rag_support"
 PROJECTS_DIR = RAG_DIR / "projects"
 
+
 def init_directories() -> bool:
     """
     Initialize RAG directories.
-    
+
     Returns:
         True if initialization was successful, False otherwise
     """
@@ -36,17 +37,18 @@ def init_directories() -> bool:
         # Ensure RAG directories exist
         RAG_DIR.mkdir(exist_ok=True)
         PROJECTS_DIR.mkdir(exist_ok=True)
-        
+
         # Add __init__.py if needed
         init_file = PROJECTS_DIR / "__init__.py"
         if not init_file.exists():
             with open(init_file, "w") as f:
                 f.write('"""Projects directory for RAG system."""\n')
-        
+
         return True
     except Exception as e:
         print(f"Error initializing RAG directories: {e}")
         return False
+
 
 # Initialize on import
 try:
@@ -61,17 +63,24 @@ try:
     from .storage import FileSystemStorage as DocumentStore
     from .search import SearchEngine, SearchResult
     from .parser import DocumentParser, MarkdownParser, TextParser, HTMLParser
-    
+
     # Export key components
     __all__ = [
-        'Document',
-        'DocumentIndexer', 'DocumentStore',
-        'DocumentParser', 'MarkdownParser', 'TextParser', 'HTMLParser',
-        'SearchEngine', 'SearchResult',
-        'BASE_DIR', 'RAG_DIR', 'PROJECTS_DIR',
-        '__version__'
+        "Document",
+        "DocumentIndexer",
+        "DocumentStore",
+        "DocumentParser",
+        "MarkdownParser",
+        "TextParser",
+        "HTMLParser",
+        "SearchEngine",
+        "SearchResult",
+        "BASE_DIR",
+        "RAG_DIR",
+        "PROJECTS_DIR",
+        "__version__",
     ]
 except ImportError as e:
     print(f"Warning: Some RAG components could not be imported: {e}")
     # Define minimal exports
-    __all__ = ['BASE_DIR', 'RAG_DIR', 'PROJECTS_DIR', '__version__']
+    __all__ = ["BASE_DIR", "RAG_DIR", "PROJECTS_DIR", "__version__"]

@@ -15,30 +15,32 @@ BASE_DIR = Path(os.environ.get("LLM_BASE_DIR", str(BASE_DIR)))
 # Version information
 __version__ = "0.1.0"
 
+
 # Initialize directories if needed
 def init_directories():
     """Initialize required directories if they don't exist"""
     try:
         # Create required directories
-        projects_dir = (SCRIPT_DIR / "projects")
-        utils_dir = (SCRIPT_DIR / "utils")
-        templates_dir = (SCRIPT_DIR / "templates")
-        
+        projects_dir = SCRIPT_DIR / "projects"
+        utils_dir = SCRIPT_DIR / "utils"
+        templates_dir = SCRIPT_DIR / "templates"
+
         # Create each directory if it doesn't exist
         for directory in [projects_dir, utils_dir, templates_dir]:
             directory.mkdir(exist_ok=True)
-            
+
         # Ensure each directory has an __init__.py file
         for directory in [projects_dir, utils_dir, templates_dir]:
             init_file = directory / "__init__.py"
             if not init_file.exists():
-                with open(init_file, 'w') as f:
+                with open(init_file, "w") as f:
                     f.write(f"# Initialize {directory.name} module\n")
-                    
+
         return True
     except Exception as e:
         print(f"Error initializing directories: {e}")
         return False
+
 
 # Initialize package on import
 try:
@@ -48,4 +50,4 @@ except Exception as e:
     # Don't raise an exception - allow import to continue even if initialization fails
 
 # Export BASE_DIR for other modules
-__all__ = ['__version__', 'BASE_DIR']
+__all__ = ["__version__", "BASE_DIR"]
