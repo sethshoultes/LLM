@@ -147,10 +147,11 @@ As this is an unreleased product, it must function cleanly out of the box with n
 
 | Task ID | Description | Dependencies | Assignee | Status | Updated |
 |---------|-------------|--------------|----------|--------|---------|
-| 4.3.1 | Remove deprecated files | 4.2.4 | | Not Started | |
-| 4.3.2 | Clean up imports and dependencies | 4.3.1 | | Not Started | |
-| 4.3.3 | Run final linting and code quality checks | 4.3.2 | | Not Started | |
-| 4.3.4 | Final verification against PRD requirements | 4.3.3 | | Not Started | |
+| 4.3.1 | Identify and list all replaced and duplicate files | 4.2.4 | Claude | In Progress | 2025-04-29 |
+| 4.3.2 | Remove all redundant files without exception | 4.3.1 | | Not Started | |
+| 4.3.3 | Clean up imports and dependencies | 4.3.2 | | Not Started | |
+| 4.3.4 | Run final linting and code quality checks | 4.3.3 | | Not Started | |
+| 4.3.5 | Final verification against PRD requirements | 4.3.4 | | Not Started | |
 
 ## Quality Gates
 
@@ -197,6 +198,7 @@ All code must pass these quality gates before being considered complete:
 4. **CLEAN ARCHITECTURE** - Maintain proper separation of concerns
 5. **THOROUGH TESTING** - All code must be thoroughly tested
 6. **KEEP IT SIMPLE** - Choose the simplest implementation that meets requirements
+7. **FILE DISPOSAL** - All replaced or duplicate files MUST be removed from the codebase - NO EXCEPTIONS
 
 ## Progress Updates
 

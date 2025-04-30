@@ -14,7 +14,10 @@ from typing import Dict, List, Optional, Any, Union, Set, Callable
 from core.logging import get_logger
 from core.utils import load_json_file, save_json_file
 
-from rag.documents import Document, DocumentCollection
+# Import Document type but defer actual import to avoid circular imports
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from rag.documents import Document, DocumentCollection
 
 # Get logger for this module
 logger = get_logger("rag.storage")
@@ -86,6 +89,15 @@ class StorageBackend:
             List of matching document metadata dictionaries
         """
         raise NotImplementedError("search_documents method must be implemented by subclasses")
+        
+    def get_all_documents(self):
+        """
+        Get all documents as a DocumentCollection.
+        
+        Returns:
+            DocumentCollection containing all documents
+        """
+        raise NotImplementedError("get_all_documents method must be implemented by subclasses")
 
 class FileSystemStorage(StorageBackend):
     """
@@ -274,13 +286,16 @@ class FileSystemStorage(StorageBackend):
         
         return results
     
-    def get_all_documents(self) -> DocumentCollection:
+    def get_all_documents(self):
         """
         Get all documents as a DocumentCollection.
         
         Returns:
             DocumentCollection containing all documents
         """
+        # Import here to avoid circular imports
+        from rag.documents import Document, DocumentCollection
+        
         collection = DocumentCollection()
         
         for file_path in self.directory.glob("*.md"):
@@ -439,13 +454,16 @@ class MemoryStorage(StorageBackend):
         
         return results
     
-    def get_all_documents(self) -> DocumentCollection:
+    def get_all_documents(self):
         """
         Get all documents as a DocumentCollection.
         
         Returns:
             DocumentCollection containing all documents
         """
+        # Import here to avoid circular imports
+        from rag.documents import DocumentCollection
+        
         collection = DocumentCollection()
         
         for document in self.documents.values():

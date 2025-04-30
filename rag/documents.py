@@ -88,12 +88,19 @@ class Document:
         # Get title from metadata or fallback to filename
         title = metadata.get('title', file_path.stem)
         
+        # Remove id and title from metadata to avoid duplicates
+        metadata_copy = metadata.copy()
+        if 'id' in metadata_copy:
+            del metadata_copy['id']
+        if 'title' in metadata_copy:
+            del metadata_copy['title']
+            
         # Create document instance
         return cls(
             id=doc_id,
             title=title,
             content=content_text,
-            **metadata
+            **metadata_copy
         )
     
     @classmethod
@@ -120,12 +127,20 @@ class Document:
         if 'content' not in data:
             raise ValueError("Document content is required")
         
+        # Extract required fields and remove from data to avoid duplicates
+        doc_id = data['id']
+        title = data['title']
+        content = data['content']
+        
+        # Copy remaining metadata
+        metadata = {k: v for k, v in data.items() if k not in ['id', 'title', 'content']}
+        
         # Create document instance
         return cls(
-            id=data['id'],
-            title=data['title'],
-            content=data['content'],
-            **{k: v for k, v in data.items() if k not in ['id', 'title', 'content']}
+            id=doc_id,
+            title=title,
+            content=content,
+            **metadata
         )
     
     @classmethod
@@ -430,6 +445,17 @@ class DocumentCollection:
             List of all documents
         """
         return list(self.documents.values())
+        
+    def get_all_documents(self) -> List[Document]:
+        """
+        Get all documents in the collection.
+        
+        This is an alias for list_all() for API compatibility.
+        
+        Returns:
+            List of all documents
+        """
+        return self.list_all()
     
     def search(self, query: str, match_title: bool = True, 
               match_content: bool = True, match_tags: bool = True) -> List[Document]:
