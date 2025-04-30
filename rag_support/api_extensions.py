@@ -35,6 +35,12 @@ if str(scripts_dir) not in sys.path:
 # Import RAG utilities
 from rag_support.utils import project_manager
 from rag_support.utils.search import search_engine
+try:
+    from rag_support.utils.hybrid_search import hybrid_search
+    HAS_HYBRID_SEARCH = True
+except ImportError:
+    HAS_HYBRID_SEARCH = False
+    logging.warning("Could not import hybrid_search module. Semantic and hybrid search will not be available.")
 
 # Try to import inference module now so it's available to all methods
 try:
@@ -189,7 +195,7 @@ class RagApiHandler:
                 # /api/projects/{id}/search
                 project_id = parts[1]
                 query = query_params.get('q', '')
-                return self._search_documents(project_id, query)
+                return self._search_documents(project_id, query, query_params)
             
             elif len(parts) == 3 and parts[2] == 'suggest':
                 # /api/projects/{id}/suggest
@@ -435,9 +441,12 @@ class RagApiHandler:
         
         return 200, {"message": "Document deleted"}
     
-    def _search_documents(self, project_id: str, query: str) -> Tuple[int, Dict[str, Any]]:
+    def _search_documents(self, project_id: str, query: str, query_params: Dict[str, str] = None) -> Tuple[int, Dict[str, Any]]:
         """Search documents in a project"""
         try:
+            # Initialize query_params if not provided
+            query_params = query_params or {}
+            
             # Validate parameters
             if not project_id:
                 return self._format_error_response(
@@ -465,9 +474,49 @@ class RagApiHandler:
                     meta={"count": 0, "query": query}
                 )
             
-            # Perform search
+            # Get search type and parameters
+            search_type = query_params.get("search_type", "keyword").lower()
+            
+            # Handle hybrid search parameters if provided
+            semantic_weight = 0.6
+            keyword_weight = 0.4
+            
+            if "semantic_weight" in query_params:
+                try:
+                    semantic_weight = float(query_params.get("semantic_weight", 0.6))
+                except ValueError:
+                    pass
+                    
+            if "keyword_weight" in query_params:
+                try:
+                    keyword_weight = float(query_params.get("keyword_weight", 0.4))
+                except ValueError:
+                    pass
+            
+            # Perform search based on type
             start_time = time.time()
-            results = search_engine.search(project_id, query)
+            search_method = "keyword"
+            
+            if search_type == "hybrid" and HAS_HYBRID_SEARCH:
+                # Use hybrid search
+                results = hybrid_search.hybrid_search(
+                    project_id, 
+                    query, 
+                    semantic_weight=semantic_weight,
+                    keyword_weight=keyword_weight
+                )
+                search_method = "hybrid"
+                
+            elif search_type == "semantic" and HAS_HYBRID_SEARCH:
+                # Use semantic search only
+                results = hybrid_search.semantic_search(project_id, query)
+                search_method = "semantic"
+                
+            else:
+                # Use standard keyword search
+                results = search_engine.search(project_id, query)
+                search_method = "keyword"
+            
             search_time = time.time() - start_time
             
             # Return results with metadata
@@ -476,15 +525,25 @@ class RagApiHandler:
                 "query": query,
                 "project_id": project_id,
                 "project_name": project.get("name", "Unknown Project"),
-                "search_time_ms": round(search_time * 1000, 2)
+                "search_time_ms": round(search_time * 1000, 2),
+                "search_type": search_method
             }
+            
+            # Add hybrid search parameters if applicable
+            if search_method == "hybrid":
+                meta["hybrid_params"] = {
+                    "semantic_weight": semantic_weight,
+                    "keyword_weight": keyword_weight
+                }
             
             return self._format_success_response(
                 data=results,
-                message=f"Found {len(results)} documents matching query",
+                message=f"Found {len(results)} documents using {search_method} search",
                 meta=meta
             )
         except Exception as e:
+            logging.error(f"Search error: {str(e)}")
+            logging.error(traceback.format_exc())
             return self._format_error_response(
                 500,
                 "Search failed",
@@ -494,15 +553,47 @@ class RagApiHandler:
     
     def _suggest_documents(self, project_id: str, query: str) -> Tuple[int, Dict[str, Any]]:
         """Suggest relevant documents for a query"""
-        if not project_manager.get_project(project_id):
-            return 404, {"error": "Project not found"}
-        
-        if not query:
-            return 200, {"suggestions": []}
-        
-        # Limit to a few top results
-        results = search_engine.search(project_id, query, max_results=3)
-        return 200, {"suggestions": results}
+        try:
+            if not project_manager.get_project(project_id):
+                return 404, {"error": "Project not found"}
+            
+            if not query:
+                return 200, {"suggestions": []}
+            
+            # Determine if hybrid search is available and use it for better suggestions
+            if HAS_HYBRID_SEARCH:
+                # Use hybrid search for better suggestions
+                results = hybrid_search.hybrid_search(project_id, query, max_results=3)
+                return self._format_success_response(
+                    data=results,
+                    message=f"Found {len(results)} document suggestions using hybrid search",
+                    meta={
+                        "count": len(results),
+                        "query": query,
+                        "search_type": "hybrid"
+                    }
+                )
+            else:
+                # Fall back to keyword search
+                results = search_engine.search(project_id, query, max_results=3)
+                return self._format_success_response(
+                    data=results,
+                    message=f"Found {len(results)} document suggestions",
+                    meta={
+                        "count": len(results),
+                        "query": query,
+                        "search_type": "keyword"
+                    }
+                )
+        except Exception as e:
+            logging.error(f"Document suggestion error: {str(e)}")
+            logging.error(traceback.format_exc())
+            return self._format_error_response(
+                500,
+                "Document suggestion failed",
+                f"Error: {str(e)}",
+                "suggestion_error"
+            )
     
     # Chat methods
     def _list_chats(self, project_id: str) -> Tuple[int, Dict[str, Any]]:

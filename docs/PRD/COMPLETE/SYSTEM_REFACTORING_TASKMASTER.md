@@ -68,7 +68,7 @@ As this is an unreleased product, it must function cleanly out of the box with n
 | 2.2.2 | Implement ranking within inverted index | 2.2.1 | Claude | Completed | 2025-04-29 |
 | 2.2.3 | Create TF-IDF indexing in indexer.py | 2.2.2 | Claude | Completed | 2025-04-29 |
 | 2.2.4 | Implement query processing in search engine | 2.2.3 | Claude | Completed | 2025-04-29 |
-| 2.2.5 | Create hybrid search functionality | 2.2.4 | Claude | Not Started | |
+| 2.2.5 | Create hybrid search functionality | 2.2.4 | Claude | Completed | 2025-04-29 |
 | 2.2.6 | Refactor existing search.py to use new modules | 2.2.1-2.2.5 | Claude | Completed | 2025-04-29 |
 | 2.2.7 | Write unit tests for search functionality | 2.2.6 | Claude | Completed | 2025-04-29 |
 
@@ -207,7 +207,7 @@ This section should be updated regularly to track overall progress.
 | Phase | Completion | Last Updated | Notes |
 |-------|------------|--------------|-------|
 | Phase 1 | 100% | 2025-04-29 | Core and Models implementation completed (16/16 tasks) |
-| Phase 2 | 94% | 2025-04-29 | Document Operations and Search functionality implemented, Context Manager refactored (14/15 tasks complete, 1 remaining) |
+| Phase 2 | 100% | 2025-04-29 | Document Operations, Search functionality, and Hybrid Search implemented (15/15 tasks complete) |
 | Phase 3 | 0% | | Not started |
 | Phase 4 | 42% | 2025-04-29 | Integration testing for core, models, and RAG completed, file cleanup in progress (3/8 tasks complete, 1 in progress) |
-| Overall | 69% | 2025-04-29 | Phase 1 complete, Phase 2 at 94%, Phase 4 at 42%. Making excellent progress. |
+| Overall | 70% | 2025-04-29 | Phase 1 and Phase 2 complete, Phase 4 at 42%. Making excellent progress. |
