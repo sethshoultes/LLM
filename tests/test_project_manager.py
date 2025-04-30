@@ -6,10 +6,7 @@ This script tests the integration between the refactored ProjectManager
 and the new RAG system components.
 """
 
-import os
 import sys
-import time
-import json
 import shutil
 from pathlib import Path
 

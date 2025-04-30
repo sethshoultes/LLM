@@ -15,8 +15,6 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 # Import core modules
-from core.paths import get_app_path, resolve_path
-from core.config import get_config, load_config
 from core.logging import get_logger
 
 # Import models modules

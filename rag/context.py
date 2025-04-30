@@ -7,10 +7,6 @@ the selection, formatting, and optimization of document contexts
 for inclusion in LLM prompts.
 """
 
-import os
-import re
-import logging
-from pathlib import Path
 from typing import Dict, List, Any, Optional, Union, Tuple, Set
 
 # Import core modules
@@ -23,7 +19,6 @@ from rag.tokens import token_manager
 # Import types but defer actual import to avoid circular imports
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from rag.documents import Document, DocumentCollection
 
 # Configure logger
 logger = get_logger("rag.context")

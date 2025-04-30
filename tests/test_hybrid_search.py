@@ -3,12 +3,10 @@
 Unit tests for the hybrid search functionality.
 """
 
-import os
 import sys
 import unittest
 import tempfile
 import shutil
-import json
 import numpy as np
 from pathlib import Path
 from unittest.mock import patch, MagicMock
@@ -17,7 +15,6 @@ from unittest.mock import patch, MagicMock
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Import the modules to test
-from rag_support.utils.hybrid_search import HybridSearch, EMBEDDING_CACHE_DIR
 
 
 class TestHybridSearch(unittest.TestCase):

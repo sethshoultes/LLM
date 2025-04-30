@@ -8,10 +8,8 @@ project management, document operations, search, and request handling.
 
 import unittest
 from unittest.mock import patch, MagicMock
-import json
 import tempfile
 import shutil
-import os
 
 from web.api.controllers.rag import RagController
 

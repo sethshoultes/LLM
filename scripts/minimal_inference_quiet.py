@@ -2,7 +2,6 @@
 # minimal_inference_quiet.py - Simple inference wrapper for LLMs with minimized debug output
 
 import os
-import sys
 import time
 from pathlib import Path
 

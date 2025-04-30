@@ -6,7 +6,6 @@ Provides a modern, modular web server implementation with clean
 routing, middleware support, and standardized API endpoints.
 """
 
-import os
 import logging
 from pathlib import Path
 
@@ -28,5 +27,3 @@ except ImportError:
     BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Import key components to make them available at package level
-from web.server import create_server, start_server
-from web.router import Router

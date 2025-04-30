@@ -10,11 +10,9 @@ Tests the basic functionality of the models module components:
 - Caching
 """
 
-import os
 import sys
 import unittest
 from pathlib import Path
-from unittest.mock import patch, MagicMock
 
 # Ensure base directories are in path
 SCRIPT_DIR = Path(__file__).resolve().parent

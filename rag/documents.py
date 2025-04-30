@@ -5,16 +5,12 @@ Document management module for the LLM Platform.
 Provides a unified Document class and related functionality for working with documents.
 """
 
-import os
-import json
 import uuid
-import time
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, List, Optional, Any, Union, Set
 
 from core.logging import get_logger
-from core.utils import parse_frontmatter, format_with_frontmatter, estimate_tokens, safe_file_name
 
 # Get logger for this module
 logger = get_logger("rag.documents")

@@ -6,11 +6,9 @@ Provides controller classes for handling API business logic,
 separating it from the route handling code.
 """
 
-import logging
 from typing import Dict, List, Any, Optional, Union, Tuple
 
 # Import from parent package
-from web.api import logger
 
 # Base controller class
 class Controller:
@@ -118,6 +116,3 @@ class Controller:
 
 
 # Import specific controllers
-from web.api.controllers.models import ModelsController
-from web.api.controllers.inference import InferenceController
-from web.api.controllers.rag import rag_controller

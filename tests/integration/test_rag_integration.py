@@ -10,13 +10,10 @@ import unittest
 import os
 import tempfile
 import shutil
-import json
-import uuid
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 # Import core modules
-from core.paths import get_app_path
 
 # Import RAG modules
 from rag_support.utils.project_manager import ProjectManager

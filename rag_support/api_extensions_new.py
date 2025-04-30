@@ -6,9 +6,7 @@ Provides API endpoints and handlers for RAG functionality, including
 project management, document operations, search, and context handling.
 """
 
-import os
 import sys
-import json
 import logging
 import traceback
 from datetime import datetime
@@ -67,7 +65,6 @@ except ImportError:
 
 # Import web API modules
 try:
-    from web.api.responses import success_response, error_response, not_found_response
     HAS_WEB_API = True
 except ImportError:
     HAS_WEB_API = False

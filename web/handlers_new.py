@@ -6,11 +6,7 @@ Provides standardized handler functions for common web server operations,
 including serving static files, rendering templates, and API requests.
 """
 
-import os
-import json
-import logging
 import traceback
-import mimetypes
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Union, Tuple, Callable
 
@@ -19,8 +15,6 @@ from core.logging import get_logger
 from core.paths import get_app_path
 
 # Import template engine modules
-from web.templates.engine import render_template, render_component, render_error, render_string
-from web.templates.assets import get_url, get_urls, get_asset
 from web.templates.components import Component
 
 # Get logger for this module

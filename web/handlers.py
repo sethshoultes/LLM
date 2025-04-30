@@ -6,7 +6,6 @@ Provides standardized handler functions for common web server operations,
 including serving static files, rendering templates, and API requests.
 """
 
-import os
 import json
 import logging
 import traceback

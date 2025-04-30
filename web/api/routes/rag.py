@@ -5,8 +5,6 @@ API routes for RAG in the LLM Platform.
 Provides routes for managing projects, documents, searches, and RAG functionality.
 """
 
-import sys
-import logging
 from typing import Dict, List, Any, Optional, Union
 
 # Import from parent package
@@ -16,7 +14,6 @@ from web.api import logger
 from web.router import Router
 
 # Import schemas and controllers
-from web.api.responses import success_response, error_response, not_found_response
 
 # Import RAG API handler
 try:

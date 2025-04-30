@@ -6,9 +6,7 @@ Tests the functionality of the RAG API extensions, including
 project management, document operations, search, and context handling.
 """
 
-import os
 import sys
-import json
 import unittest
 import tempfile
 import shutil

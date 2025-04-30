@@ -6,7 +6,6 @@ This module defines the Flask routes for the RAG API, handling project, document
 and search functionality using the RagController.
 """
 
-from flask import Blueprint, request, jsonify, current_app
 import logging
 
 from web.api.controllers.rag import rag_controller

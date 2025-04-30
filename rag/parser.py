@@ -7,8 +7,6 @@ Provides functionality for parsing different document formats and extracting con
 
 import re
 import json
-import yaml
-from pathlib import Path
 from typing import Dict, List, Tuple, Optional, Any, Union
 
 from core.logging import get_logger

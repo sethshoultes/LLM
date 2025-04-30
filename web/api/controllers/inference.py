@@ -5,7 +5,6 @@ API controllers for inference in the LLM Platform.
 Provides controllers for inference-related endpoints.
 """
 
-import logging
 import time
 from typing import Dict, List, Any, Optional, Union
 

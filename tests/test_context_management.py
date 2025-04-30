@@ -7,14 +7,9 @@ token allocation, document prioritization, and context formatting
 modules of the RAG system.
 """
 
-import os
 import sys
 import unittest
-import tempfile
-import shutil
-import json
 from pathlib import Path
-from unittest.mock import patch, MagicMock
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))

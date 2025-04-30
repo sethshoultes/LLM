@@ -8,13 +8,10 @@ Provides unified model loading functionality for different model types.
 import os
 import gc
 import time
-import importlib
 from pathlib import Path
 from typing import Dict, Any, Optional, Union, List, Tuple
 
-from core.paths import path_manager, resolve_path
 from core.logging import get_logger
-from core.errors import ModelError, ModelNotFoundError, ModelLoadError
 from core.utils import timer
 
 from models.registry import model_registry, get_model_info
@@ -73,7 +70,6 @@ class ModelLoader:
         elif loader_type == "transformers":
             try:
                 import transformers
-                import torch
                 return True
             except ImportError:
                 logger.warning("Transformers or PyTorch not installed. Please install with: pip install transformers torch")
@@ -204,7 +200,6 @@ class ModelLoader:
         
         try:
             import transformers
-            import torch
             
             # Combine default settings with overrides
             settings = dict(self.default_settings["transformers"])

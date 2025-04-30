@@ -14,10 +14,10 @@ This ensures consistent configuration across the entire application.
 import os
 import json
 import argparse
-from pathlib import Path
 from typing import Any, Dict, Optional, Union, List, Set
+from pathlib import Path
+from .paths import resolve_path
 
-from core.paths import resolve_path, get_path
 
 class Config:
     """Centralized configuration management for the LLM Platform."""

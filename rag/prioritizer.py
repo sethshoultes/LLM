@@ -7,11 +7,7 @@ relevance scores, query analysis, conversation history, and other factors
 to optimize context selection for RAG systems.
 """
 
-import os
 import re
-import math
-import logging
-from pathlib import Path
 from typing import Dict, List, Any, Optional, Union, Tuple, Set
 from collections import Counter
 
@@ -20,7 +16,6 @@ from core.logging import get_logger
 from core.utils import timer
 
 # Import from tokens module
-from rag.tokens import token_manager
 
 # Configure logger
 logger = get_logger("rag.prioritizer")

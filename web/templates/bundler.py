@@ -14,8 +14,6 @@ import hashlib
 import json
 import re
 import time
-import subprocess
-import tempfile
 
 from core.paths import get_app_path
 

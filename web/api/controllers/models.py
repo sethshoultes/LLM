@@ -5,7 +5,6 @@ API controllers for models in the LLM Platform.
 Provides controllers for model-related endpoints.
 """
 
-import logging
 from typing import Dict, List, Any, Optional, Union
 
 # Import from parent package

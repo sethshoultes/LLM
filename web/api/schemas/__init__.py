@@ -5,11 +5,9 @@ API request/response schemas for the LLM Platform.
 Provides schemas for validating API requests and standardizing responses.
 """
 
-import logging
 from typing import Dict, List, Any, Optional, Union, Tuple, Callable, Type
 
 # Import from parent package
-from web.api import logger
 
 # Schema validation class
 class Schema:
@@ -80,5 +78,3 @@ class Schema:
 
 
 # Import specific schemas
-from web.api.schemas.models import ModelListSchema, ModelSchema
-from web.api.schemas.inference import GenerateRequestSchema, GenerateResponseSchema

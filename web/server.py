@@ -6,12 +6,8 @@ Provides a lightweight HTTP server with support for routing, middleware,
 and standardized request/response handling.
 """
 
-import os
-import sys
-import http.server
 import socketserver
 import json
-import urllib.parse
 import threading
 import webbrowser
 import time
@@ -24,7 +20,6 @@ from typing import Dict, List, Any, Optional, Union, Tuple, Callable
 try:
     from core.logging import get_logger
     from core.config import get_config
-    from core.paths import get_base_dir
 except ImportError:
     # Fallback if core modules are not available
     logging.basicConfig(

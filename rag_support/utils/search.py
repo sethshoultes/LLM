@@ -21,8 +21,6 @@ from core.utils import timer, estimate_tokens
 # Import RAG types but defer actual import to avoid circular imports
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from rag.documents import Document, DocumentCollection
-    from rag.search import SearchEngine, SearchResult
 
 # Get logger for this module
 logger = get_logger("rag_support.search")

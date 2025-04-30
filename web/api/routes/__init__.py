@@ -5,11 +5,9 @@ API routes for the LLM Platform.
 Provides RESTful API endpoint registration and routing logic.
 """
 
-import logging
 from typing import Dict, List, Any, Optional, Union, Tuple
 
 # Import from parent package
-from web.api import logger
 
 # Import from web server modules
 from web.router import Router

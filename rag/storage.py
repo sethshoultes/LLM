@@ -6,18 +6,19 @@ Provides functionality for storing and retrieving documents from different stora
 """
 
 import os
-import json
 import shutil
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Union, Set, Callable
 
 from core.logging import get_logger
-from core.utils import load_json_file, save_json_file
 
-# Import Document type but defer actual import to avoid circular imports
+# Import Document for type annotations
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from rag.documents import Document, DocumentCollection
+
+# Import Document class for actual use
+from rag.documents import Document
 
 # Get logger for this module
 logger = get_logger("rag.storage")

@@ -10,7 +10,6 @@ import unittest
 import os
 import tempfile
 import shutil
-import json
 import threading
 import time
 import requests
@@ -18,10 +17,8 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 # Import server components
-from web.server import Server, RequestHandler
 from web.router import Router
 from web.middleware import apply_middleware
-from web.handlers_new import json_api, render_view, static_handler
 from web.middleware.template_middleware import template_middleware
 
 # Import API controllers

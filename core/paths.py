@@ -203,3 +203,7 @@ def ensure_dir(path: Union[str, Path], relative_to: Optional[str] = None) -> Pat
 def list_models(format_filter: Optional[str] = None) -> Dict[str, Path]:
     """List available model paths."""
     return path_manager.list_models(format_filter)
+
+def get_app_path() -> Path:
+    """Get the base application path."""
+    return path_manager.base_dir

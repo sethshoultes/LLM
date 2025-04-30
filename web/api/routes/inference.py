@@ -5,8 +5,6 @@ API routes for inference in the LLM Platform.
 Provides routes for text generation and inference using LLM models.
 """
 
-import sys
-import logging
 from typing import Dict, List, Any, Optional, Union
 
 # Import from parent package
@@ -16,9 +14,7 @@ from web.api import logger
 from web.router import Router
 
 # Import schemas and controllers
-from web.api.schemas.inference import GenerateRequestSchema, GenerateResponseSchema
 from web.api.controllers.inference import InferenceController
-from web.api.responses import success_response, error_response, not_found_response
 
 # Import inference module
 try:

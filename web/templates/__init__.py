@@ -5,5 +5,7 @@ Templates package for the LLM Platform web server.
 Contains template handling and rendering logic for the web interface.
 """
 
-# Import template-related components
-from web.templates.engine import render_template
+from .engine import TemplateEngine
+from .components import Component
+from .assets import AssetManager
+from .bundler import Bundler as AssetBundler

@@ -11,10 +11,8 @@ The script follows the refactoring principles in the SYSTEM_REFACTORING_PRD.md,
 particularly the requirement that all replaced or duplicate files MUST be removed.
 """
 
-import os
 import sys
 import re
-import glob
 from pathlib import Path
 from typing import List, Dict, Set, Tuple
 

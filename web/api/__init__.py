@@ -24,5 +24,10 @@ except ImportError:
 logger = get_logger("web.api")
 
 # Import key components to make them available at package level
-from web.api.routes import register_api_routes
-from web.api.responses import success_response, error_response, not_found_response
+from .responses import (
+    success_response, 
+    error_response, 
+    not_found_response
+)
+
+from .versioning import APIVersion, get_current_version

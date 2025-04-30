@@ -9,10 +9,8 @@ This script tests the core functionality of the RAG system:
 - Indexing and search
 """
 
-import os
 import sys
 import json
-import uuid
 from pathlib import Path
 
 # Add parent directory to path
@@ -21,10 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 # Import RAG components
 try:
     from rag.documents import Document, DocumentCollection
-    from rag.storage import StorageBackend, FileSystemStorage, MemoryStorage
-    from rag.parser import DocumentParser, MarkdownParser, TextParser, HTMLParser
     from rag.indexer import InvertedIndex, TfidfIndex
-    from rag.search import SearchEngine, SearchResult
 except ImportError as e:
     print(f"Error importing RAG components: {e}")
     sys.exit(1)

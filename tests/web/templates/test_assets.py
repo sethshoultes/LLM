@@ -7,13 +7,10 @@ content retrieval, and cache busting.
 """
 
 import unittest
-from unittest.mock import patch, MagicMock
 import tempfile
 import shutil
 import os
 from pathlib import Path
-import hashlib
-import time
 import json
 
 from web.templates.assets import (

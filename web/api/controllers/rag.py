@@ -7,7 +7,6 @@ handling project, document, and search operations.
 """
 
 from typing import Dict, Any, Tuple, Optional, List
-import json
 import traceback
 import logging
 

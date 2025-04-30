@@ -5,12 +5,10 @@ API responses for the LLM Platform.
 Provides standardized response formatting for API endpoints.
 """
 
-import logging
 import time
 from typing import Dict, List, Any, Optional, Union, Tuple
 
 # Import from parent package
-from web.api import logger
 
 # HTTP status codes
 HTTP_OK = 200

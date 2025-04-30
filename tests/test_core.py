@@ -25,8 +25,6 @@ if str(BASE_DIR) not in sys.path:
 # Import modules to test
 from core import initialize as init_core
 from core.paths import get_path, resolve_path, ensure_dir
-from core.config import get, set_value, is_debug
-from core.logging import get_logger
 from core.errors import LLMError, ModelError
 from core.utils import parse_frontmatter, format_with_frontmatter, estimate_tokens
 

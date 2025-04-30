@@ -6,10 +6,6 @@ Provides formatting utilities for preparing document content for inclusion
 in prompts, with support for different model and interface requirements.
 """
 
-import os
-import re
-import logging
-from pathlib import Path
 from typing import Dict, List, Any, Optional, Union, Tuple
 
 # Import core modules

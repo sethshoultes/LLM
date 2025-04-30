@@ -7,10 +7,6 @@ use cases, optimizing context usage based on conversation dynamics
 and document characteristics.
 """
 
-import os
-import logging
-import math
-from pathlib import Path
 from typing import Dict, List, Any, Optional, Union, Tuple, Set
 
 # Import core modules

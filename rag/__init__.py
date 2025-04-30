@@ -56,18 +56,17 @@ except Exception as e:
 
 # Import key components for easier access
 try:
-    from .documents import Document, DocumentCollection
-    from .storage import StorageBackend, FileSystemStorage, MemoryStorage
-    from .parser import DocumentParser, MarkdownParser, TextParser, HTMLParser
-    from .indexer import InvertedIndex, TfidfIndex
+    from .documents import Document
+    from .indexer import DocumentIndexer
+    from .storage import FileSystemStorage as DocumentStore
     from .search import SearchEngine, SearchResult
+    from .parser import DocumentParser, MarkdownParser, TextParser, HTMLParser
     
     # Export key components
     __all__ = [
-        'Document', 'DocumentCollection',
-        'StorageBackend', 'FileSystemStorage', 'MemoryStorage',
+        'Document',
+        'DocumentIndexer', 'DocumentStore',
         'DocumentParser', 'MarkdownParser', 'TextParser', 'HTMLParser',
-        'InvertedIndex', 'TfidfIndex',
         'SearchEngine', 'SearchResult',
         'BASE_DIR', 'RAG_DIR', 'PROJECTS_DIR',
         '__version__'

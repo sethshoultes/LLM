@@ -7,13 +7,7 @@ attributes handling, and component composition.
 """
 
 import unittest
-from unittest.mock import patch, MagicMock
-import tempfile
-import shutil
-import os
-from pathlib import Path
 
-from web.templates.components import (
     Component,
     Container,
     TextBlock,

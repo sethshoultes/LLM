@@ -7,7 +7,6 @@ and adaptive document selection.
 """
 
 import os
-import logging
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple, Union
 
@@ -18,8 +17,6 @@ from core.utils import timer
 # Import RAG types but defer actual import to avoid circular imports
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from rag.documents import Document, DocumentCollection
-    from rag.search import SearchEngine, SearchResult
 
 # Get logger for this module
 logger = get_logger("rag_support.context_manager")

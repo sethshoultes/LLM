@@ -3,8 +3,6 @@
 
 import os
 import sys
-import json
-import urllib.parse
 import time
 import traceback
 from datetime import datetime

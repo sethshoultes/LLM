@@ -8,7 +8,6 @@ web server, routing, middleware, and handler systems.
 
 import os
 import sys
-import json
 import logging
 import argparse
 from pathlib import Path
@@ -91,10 +90,8 @@ else:
     
 # Import web modules
 try:
-    from web.server import create_server, start_server
     from web.router import Router
     from web.middleware import request_logger, response_logger, static_files, json_body_parser, cors_headers
-    from web.handlers import render_view, json_api, redirect
 except ImportError as e:
     print(f"Error importing web modules: {e}")
     print("Please ensure web modules are installed.")

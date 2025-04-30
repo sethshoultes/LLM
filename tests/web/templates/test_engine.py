@@ -7,13 +7,11 @@ component inclusion, and error handling.
 """
 
 import unittest
-from unittest.mock import patch, MagicMock
 import tempfile
 import shutil
 import os
 from pathlib import Path
 
-from web.templates.engine import (
     TemplateEngine, 
     render_template, 
     render_component, 

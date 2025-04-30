@@ -5,14 +5,13 @@ Model registry module for the LLM Platform.
 Provides a registry for available models with metadata and capabilities.
 """
 
-import os
 import time
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Union, Tuple
 
-from core.paths import path_manager, get_path
 from core.logging import get_logger
-from core.utils import timer, memoize
+from core.utils import timer
+from core.paths import path_manager
 
 # Get logger for this module
 logger = get_logger("models.registry")

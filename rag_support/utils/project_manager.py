@@ -16,14 +16,11 @@ from typing import List, Dict, Any, Optional, Union, Set
 
 # Import from core modules
 from core.logging import get_logger
-from core.utils import timer, safe_file_name
 
 # Import from RAG modules
 from rag.documents import Document, DocumentCollection
 from rag.storage import FileSystemStorage
-from rag.parser import MarkdownParser, TextParser
 from rag.indexer import TfidfIndex
-from rag.search import SearchEngine, SearchResult
 
 # Get logger for this module
 logger = get_logger("rag_support.project_manager")

@@ -6,8 +6,6 @@ Provides middleware for injecting common template variables into responses
 and handling template-related concerns.
 """
 
-import logging
-from pathlib import Path
 from typing import Dict, Any, Callable
 
 from core.logging import get_logger

@@ -6,7 +6,6 @@ Provides intelligent model caching to optimize memory usage and performance.
 """
 
 import time
-import gc
 from typing import Dict, List, Optional, Any, Union, Set
 
 from core.logging import get_logger

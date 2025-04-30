@@ -8,7 +8,6 @@ in the RAG system based on user queries.
 
 from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
-from pathlib import Path
 import logging
 
 from .documents import Document, DocumentCollection

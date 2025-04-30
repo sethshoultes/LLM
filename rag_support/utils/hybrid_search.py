@@ -7,15 +7,11 @@ to provide more accurate and relevant document retrieval for RAG systems.
 """
 
 import os
-import re
-import math
 import json
 import time
-import logging
 import numpy as np
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple, Union, Set
-from collections import defaultdict
 
 # Import from core modules
 from core.logging import get_logger
@@ -25,8 +21,6 @@ from core.paths import ensure_dir_exists
 # Import RAG types but defer actual import to avoid circular imports
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
-    from rag.documents import Document, DocumentCollection
-    from rag.search import SearchEngine, SearchResult
 
 # Get logger for this module
 logger = get_logger("rag_support.hybrid_search")

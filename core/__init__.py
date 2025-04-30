@@ -13,22 +13,22 @@ This module provides core functionality and utilities used across the platform:
 __version__ = "0.1.0"
 
 # Import core components for easier access
-from core.paths import (
-    path_manager, get_path, resolve_path, ensure_dir, list_models
+from .paths import (
+    get_path, resolve_path, ensure_dir, list_models
 )
-from core.config import (
-    config, get, set_value, is_debug, is_rag_enabled, parse_args, save_config
+from .config import (
+    get, set_value, is_debug, is_rag_enabled, parse_args, save_config
 )
-from core.logging import (
-    log_manager, get_logger, initialize as initialize_logging, 
+from .logging import (
+    get_logger, initialize as initialize_logging, 
     set_debug, log_exception
 )
-from core.errors import (
+from .errors import (
     LLMError, ConfigError, PathError, ModelError, RAGError, APIError,
     BadRequestError, NotFoundError, ServerError,
     format_error, log_error, handle_api_error
 )
-from core.utils import (
+from .utils import (
     timer, memoize, load_json_file, save_json_file, merge_dicts,
     create_unique_id, estimate_tokens, parse_frontmatter, format_with_frontmatter
 )

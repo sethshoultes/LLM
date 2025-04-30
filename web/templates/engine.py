@@ -6,17 +6,14 @@ Provides functions for loading and rendering templates from files,
 with support for template inheritance, partials, and context variables.
 """
 
-import os
-import re
 import logging
 import json
 import hashlib
-import time
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Union, Tuple
 
 # Import jinja2 for modern template handling
-from jinja2 import Environment, FileSystemLoader, select_autoescape, Template
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 from jinja2.exceptions import TemplateNotFound
 
 # Import core modules

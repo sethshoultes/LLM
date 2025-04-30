@@ -18,12 +18,8 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 # Import core modules
-from core.paths import get_app_path, resolve_path
-from core.config import get_config, load_config
 
 # Import models modules
-from models.registry import get_model_info, get_available_models
-from models.loader import load_model, unload_model, is_model_loaded
 from models.generation import generate_text
 
 # Import RAG modules
@@ -32,10 +28,7 @@ from rag_support.utils.search import SearchEngine
 from rag_support.utils.context_manager import ContextManager
 
 # Import web modules
-from web.server import Server, RequestHandler
 from web.router import Router
-from web.middleware import apply_middleware
-from web.handlers_new import json_api, render_view, static_handler
 
 
 class EndToEndTest(unittest.TestCase):

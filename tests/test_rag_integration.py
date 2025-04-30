@@ -9,9 +9,7 @@ This script tests the integration between various RAG components:
 - Project management
 """
 
-import os
 import sys
-import json
 import shutil
 import uuid
 from pathlib import Path
@@ -27,7 +25,6 @@ TEST_DIR.mkdir(exist_ok=True, parents=True)
 try:
     from rag.documents import Document, DocumentCollection
     from rag.storage import FileSystemStorage, MemoryStorage
-    from rag.parser import MarkdownParser, TextParser
     from rag.indexer import TfidfIndex
     from rag.search import SearchEngine
     from rag_support.utils.project_manager_refactored import ProjectManager

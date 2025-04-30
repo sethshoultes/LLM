@@ -5,8 +5,6 @@ API routes for models in the LLM Platform.
 Provides routes for listing, getting, and managing models.
 """
 
-import sys
-import logging
 from typing import Dict, List, Any, Optional, Union
 
 # Import from parent package
@@ -16,7 +14,6 @@ from web.api import logger
 from web.router import Router
 
 # Import schemas and controllers
-from web.api.schemas.models import ModelListSchema, ModelSchema
 from web.api.controllers.models import ModelsController
 from web.api.responses import success_response, error_response, not_found_response
 

@@ -6,7 +6,6 @@ Tests the functionality of the server, router, middleware, and handlers
 components of the web server system.
 """
 
-import os
 import sys
 import json
 import unittest
@@ -18,7 +17,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Import the modules to test
 from web.server import Request, Response, Server, create_server
-from web.router import Router, Route
 from web.middleware import request_logger, json_body_parser, cors_headers
 from web.handlers import StaticFileHandler, TemplateHandler, ApiHandler
 
