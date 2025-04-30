@@ -9,36 +9,21 @@ with support for template inheritance, partials, and context variables.
 import os
 import re
 import logging
+import json
+import hashlib
+import time
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Union, Tuple
 
+# Import jinja2 for modern template handling
+from jinja2 import Environment, FileSystemLoader, select_autoescape, Template
+from jinja2.exceptions import TemplateNotFound
+
 # Import core modules
-try:
-    from core.logging import get_logger
-    from core.paths import get_base_dir
-except ImportError:
-    # Fallback if core modules are not available
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
-    get_logger = lambda name: logging.getLogger(name)
-    get_base_dir = lambda: Path(__file__).resolve().parent.parent.parent
+from core.paths import get_app_path
 
 # Get logger for this module
-logger = get_logger("web.templates.engine")
-
-# Get base directory
-BASE_DIR = get_base_dir()
-
-# Template directories
-TEMPLATES_DIR = BASE_DIR / "templates"
-LAYOUTS_DIR = TEMPLATES_DIR / "layouts"
-COMPONENTS_DIR = TEMPLATES_DIR / "components"
-
-# Template cache
-template_cache = {}
-cache_enabled = True
+logger = logging.getLogger(__name__)
 
 
 class TemplateEngine:
@@ -46,467 +31,352 @@ class TemplateEngine:
     Template rendering engine.
     
     Loads templates from files and renders them with context variables,
-    supporting template inheritance, partials, and simple expressions.
+    supporting template inheritance, partials, and component-based UI.
     """
     
-    def __init__(self, templates_dir=None, layouts_dir=None, components_dir=None):
-        """
-        Initialize template engine.
+    def __init__(self, template_dir: Optional[Union[str, Path]] = None):
+        """Initialize the template engine.
         
         Args:
-            templates_dir: Base directory for templates
-            layouts_dir: Directory for layout templates
-            components_dir: Directory for component templates
+            template_dir: Optional custom template directory.
+                          If not provided, defaults to app_path/templates
         """
-        # Set template directories
-        self.templates_dir = Path(templates_dir) if templates_dir else TEMPLATES_DIR
-        self.layouts_dir = Path(layouts_dir) if layouts_dir else LAYOUTS_DIR
-        self.components_dir = Path(components_dir) if components_dir else COMPONENTS_DIR
+        self.template_dir = Path(template_dir) if template_dir else get_app_path() / "templates"
+        self.components_dir = self.template_dir / "components"
+        self.layouts_dir = self.template_dir / "layouts"
         
-        # Template cache
-        self.cache = {}
-        self.cache_enabled = cache_enabled
+        # Check if directories exist
+        if not self.template_dir.exists():
+            logger.warning(f"Template directory {self.template_dir} does not exist")
+            
+        if not self.components_dir.exists():
+            logger.warning(f"Components directory {self.components_dir} does not exist")
+            
+        if not self.layouts_dir.exists():
+            logger.warning(f"Layouts directory {self.layouts_dir} does not exist")
+        
+        # Initialize Jinja environment
+        self.env = Environment(
+            loader=FileSystemLoader(str(self.template_dir)),
+            autoescape=select_autoescape(['html', 'xml']),
+            cache_size=100,
+            auto_reload=True
+        )
+        
+        # Template cache with timestamps
+        self._template_cache: Dict[str, Dict[str, Any]] = {}
+        
+        # Register custom filters
+        self.register_filters()
+        
+        # Register global functions
+        self.register_globals()
     
-    def render_template(self, template_name, **context):
-        """
-        Render a template with context variables.
+    def register_filters(self):
+        """Register custom template filters."""
+        # Add JSON filter
+        self.env.filters['json'] = lambda obj: json.dumps(obj)
+        
+        # Add date formatting filter
+        self.env.filters['format_date'] = lambda d, fmt='%Y-%m-%d': d.strftime(fmt) if d else ''
+        
+        # Add truncate filter with ellipsis
+        def truncate(s, length=50, end='...'):
+            if not s:
+                return ''
+            if len(s) <= length:
+                return s
+            return s[:length].rstrip() + end
+            
+        self.env.filters['truncate'] = truncate
+    
+    def register_globals(self):
+        """Register global functions and variables for templates."""
+        # Add include_component function
+        self.env.globals['include_component'] = self.include_component
+        
+        # Add asset_url function
+        self.env.globals['asset_url'] = self.get_asset_url
+        
+        # Add static variables
+        self.env.globals['app_name'] = "LLM Platform"
+        self.env.globals['version'] = "1.0.0"
+    
+    def include_component(self, name: str, **kwargs) -> str:
+        """Include a component in a template.
         
         Args:
-            template_name: Name of the template file
-            **context: Context variables for template rendering
+            name: Component name (without extension)
+            **kwargs: Component context variables
             
         Returns:
-            Rendered template string
+            Rendered component HTML
         """
-        # Load template
-        template_content = self.load_template(template_name)
-        
-        # Check if template extends a layout
-        layout_match = re.search(r'{%\s*extends\s+[\'"]([^\'"]+)[\'"].*?%}', template_content)
-        
-        if layout_match:
-            # Template extends a layout
-            layout_name = layout_match.group(1)
-            layout_content = self.load_template(layout_name, is_layout=True)
-            
-            # Extract template blocks
-            blocks = self._extract_blocks(template_content)
-            
-            # Replace block placeholders in layout
-            rendered = layout_content
-            for block_name, block_content in blocks.items():
-                block_pattern = r'{%\s*block\s+' + re.escape(block_name) + r'\s*%}.*?{%\s*endblock\s*%}'
-                rendered = re.sub(block_pattern, block_content, rendered, flags=re.DOTALL)
-            
-            # Remove any remaining block placeholders
-            rendered = re.sub(r'{%\s*block\s+(\w+)\s*%}.*?{%\s*endblock\s*%}', '', rendered, flags=re.DOTALL)
-        else:
-            # Template doesn't extend a layout
-            rendered = template_content
-        
-        # Process includes
-        rendered = self._process_includes(rendered)
-        
-        # Render variables
-        rendered = self._render_variables(rendered, context)
-        
-        # Render conditionals
-        rendered = self._render_conditionals(rendered, context)
-        
-        # Render loops
-        rendered = self._render_loops(rendered, context)
-        
-        return rendered
+        try:
+            return self.render_component(name, **kwargs)
+        except Exception as e:
+            logger.error(f"Error including component {name}: {str(e)}")
+            return f"<!-- Error including component {name}: {str(e)} -->"
     
-    def load_template(self, template_name, is_layout=False, is_component=False):
-        """
-        Load a template from file.
+    def get_asset_url(self, path: str) -> str:
+        """Get the URL for an asset.
         
         Args:
-            template_name: Name of the template file
-            is_layout: Whether the template is a layout
-            is_component: Whether the template is a component
+            path: Asset path relative to assets directory
             
         Returns:
-            Template content as string
+            Asset URL with cache-busting parameter if applicable
         """
-        # Check cache first
-        cache_key = f"{'layout' if is_layout else 'component' if is_component else 'template'}:{template_name}"
-        if self.cache_enabled and cache_key in self.cache:
-            return self.cache[cache_key]
+        # Construct file path
+        asset_path = self.template_dir / "assets" / path
         
-        # Determine template directory
-        if is_layout:
-            template_dir = self.layouts_dir
-        elif is_component:
-            template_dir = self.components_dir
-        else:
-            template_dir = self.templates_dir
+        # If file doesn't exist, return the path as-is
+        if not asset_path.exists():
+            return f"/assets/{path}"
         
+        # Get file modification time for cache busting
+        mtime = asset_path.stat().st_mtime
+        mtime_hash = hashlib.md5(str(mtime).encode()).hexdigest()[:8]
+        
+        # Return URL with cache-busting parameter
+        return f"/assets/{path}?v={mtime_hash}"
+    
+    def render_template(self, template_name: str, context: Dict[str, Any] = None) -> str:
+        """Render a template with the given context.
+        
+        Args:
+            template_name: Template name (with or without extension)
+            context: Template variables
+            
+        Returns:
+            Rendered template as string
+            
+        Raises:
+            TemplateNotFound: If the template could not be found
+        """
+        if context is None:
+            context = {}
+            
         # Add .html extension if not present
         if not template_name.endswith('.html'):
-            template_name += '.html'
+            template_name = f"{template_name}.html"
         
-        # Load template from file
         try:
-            template_path = template_dir / template_name
-            with open(template_path, 'r') as f:
-                content = f.read()
+            # Get template
+            template = self.env.get_template(template_name)
             
-            # Cache template
-            if self.cache_enabled:
-                self.cache[cache_key] = content
-            
-            return content
+            # Render template with context
+            return template.render(**context)
+        except TemplateNotFound:
+            logger.error(f"Template not found: {template_name}")
+            raise
         except Exception as e:
-            logger.error(f"Error loading template {template_name}: {e}")
-            return f"<!-- Error loading template {template_name}: {e} -->"
+            logger.error(f"Error rendering template {template_name}: {str(e)}")
+            raise
     
-    def _extract_blocks(self, template_content):
-        """
-        Extract blocks from a template.
+    def render_component(self, component_name: str, **kwargs) -> str:
+        """Render a component with the given context.
         
         Args:
-            template_content: Template content string
+            component_name: Component name (without extension)
+            **kwargs: Component context variables
             
         Returns:
-            Dictionary mapping block names to block content
+            Rendered component as string
+            
+        Raises:
+            TemplateNotFound: If the component could not be found
         """
-        blocks = {}
+        # Add .html extension if not present
+        if not component_name.endswith('.html'):
+            component_name = f"{component_name}.html"
         
-        # Find all blocks
-        block_pattern = r'{%\s*block\s+(\w+)\s*%}(.*?){%\s*endblock\s*%}'
-        for match in re.finditer(block_pattern, template_content, re.DOTALL):
-            block_name = match.group(1)
-            block_content = match.group(2)
-            blocks[block_name] = block_content
+        # Construct component path
+        component_path = f"components/{component_name}"
         
-        return blocks
+        try:
+            # Get component template
+            template = self.env.get_template(component_path)
+            
+            # Render component with context
+            return template.render(**kwargs)
+        except TemplateNotFound:
+            logger.error(f"Component not found: {component_name}")
+            raise
+        except Exception as e:
+            logger.error(f"Error rendering component {component_name}: {str(e)}")
+            raise
     
-    def _process_includes(self, template_content):
-        """
-        Process include statements in a template.
+    def render_string(self, template_string: str, context: Dict[str, Any] = None) -> str:
+        """Render a template string with the given context.
         
         Args:
-            template_content: Template content string
+            template_string: Template string
+            context: Template variables
             
         Returns:
-            Template with includes processed
+            Rendered template as string
         """
-        include_pattern = r'{%\s*include\s+[\'"]([^\'"]+)[\'"].*?%}'
-        
-        # Find all includes
-        def replace_include(match):
-            include_name = match.group(1)
-            include_content = self.load_template(include_name, is_component=True)
-            return include_content
-        
-        # Replace includes
-        rendered = re.sub(include_pattern, replace_include, template_content)
-        
-        return rendered
+        if context is None:
+            context = {}
+            
+        try:
+            # Create template from string
+            template = self.env.from_string(template_string)
+            
+            # Render template with context
+            return template.render(**context)
+        except Exception as e:
+            logger.error(f"Error rendering template string: {str(e)}")
+            raise
     
-    def _render_variables(self, template_content, context):
-        """
-        Render variables in a template.
+    def render_error(self, error_code: int, message: str = None, **kwargs) -> str:
+        """Render an error page.
         
         Args:
-            template_content: Template content string
-            context: Context variables
+            error_code: HTTP error code (e.g., 404, 500)
+            message: Optional error message
+            **kwargs: Additional context variables
             
         Returns:
-            Template with variables rendered
+            Rendered error page as string
         """
-        # Simple variable pattern: {{ variable }}
-        var_pattern = r'{{(.*?)}}'
+        # Set up error context
+        context = {
+            "error_code": error_code,
+            "error_message": message,
+            **kwargs
+        }
         
-        def replace_var(match):
-            var_expr = match.group(1).strip()
-            
-            try:
-                # Evaluate variable expression
-                result = self._eval_expression(var_expr, context)
-                
-                # Convert to string
-                if result is None:
-                    return ''
-                return str(result)
-            except Exception as e:
-                logger.error(f"Error rendering variable '{var_expr}': {e}")
-                return f"<!-- Error: {e} -->"
-        
-        # Replace variables
-        rendered = re.sub(var_pattern, replace_var, template_content)
-        
-        return rendered
-    
-    def _render_conditionals(self, template_content, context):
-        """
-        Render conditional statements in a template.
-        
-        Args:
-            template_content: Template content string
-            context: Context variables
-            
-        Returns:
-            Template with conditionals rendered
-        """
-        # If-Else pattern
-        if_pattern = r'{%\s*if\s+(.*?)\s*%}(.*?)(?:{%\s*else\s*%}(.*?))?{%\s*endif\s*%}'
-        
-        def replace_if(match):
-            condition = match.group(1).strip()
-            if_block = match.group(2)
-            else_block = match.group(3) if match.group(3) else ''
-            
-            try:
-                # Evaluate condition
-                result = self._eval_expression(condition, context)
-                
-                # Return appropriate block
-                if result:
-                    return if_block
-                else:
-                    return else_block
-            except Exception as e:
-                logger.error(f"Error evaluating condition '{condition}': {e}")
-                return f"<!-- Error in condition: {e} -->"
-        
-        # Process all conditionals
-        rendered = template_content
-        while re.search(if_pattern, rendered, re.DOTALL):
-            rendered = re.sub(if_pattern, replace_if, rendered, flags=re.DOTALL)
-        
-        return rendered
-    
-    def _render_loops(self, template_content, context):
-        """
-        Render loop statements in a template.
-        
-        Args:
-            template_content: Template content string
-            context: Context variables
-            
-        Returns:
-            Template with loops rendered
-        """
-        # For loop pattern
-        for_pattern = r'{%\s*for\s+(\w+)\s+in\s+(.*?)\s*%}(.*?){%\s*endfor\s*%}'
-        
-        def replace_for(match):
-            item_name = match.group(1)
-            collection_expr = match.group(2).strip()
-            loop_block = match.group(3)
-            
-            try:
-                # Evaluate collection expression
-                collection = self._eval_expression(collection_expr, context)
-                
-                # Iterate over collection
-                result = []
-                loop_index = 0
-                
-                if collection:
-                    for item in collection:
-                        # Create loop context
-                        loop_context = context.copy()
-                        loop_context[item_name] = item
-                        loop_context['loop'] = {
-                            'index': loop_index,
-                            'index1': loop_index + 1,
-                            'first': loop_index == 0,
-                            'last': loop_index == len(collection) - 1
-                        }
-                        
-                        # Render loop block with loop context
-                        rendered_block = loop_block
-                        rendered_block = self._render_variables(rendered_block, loop_context)
-                        rendered_block = self._render_conditionals(rendered_block, loop_context)
-                        
-                        result.append(rendered_block)
-                        loop_index += 1
-                
-                return ''.join(result)
-            except Exception as e:
-                logger.error(f"Error in loop '{item_name} in {collection_expr}': {e}")
-                return f"<!-- Error in loop: {e} -->"
-        
-        # Process all loops
-        rendered = template_content
-        while re.search(for_pattern, rendered, re.DOTALL):
-            rendered = re.sub(for_pattern, replace_for, rendered, flags=re.DOTALL)
-        
-        return rendered
-    
-    def _eval_expression(self, expr, context):
-        """
-        Evaluate a simple expression in template context.
-        
-        Args:
-            expr: Expression string
-            context: Context variables
-            
-        Returns:
-            Evaluated expression result
-        """
-        # Simple implementation - handles variable access and basic methods
-        expr = expr.strip()
-        
-        # Handle literals
-        if expr.lower() == 'true':
-            return True
-        elif expr.lower() == 'false':
-            return False
-        elif expr.lower() == 'none':
-            return None
-        elif expr.isdigit():
-            return int(expr)
-        elif expr.startswith("'") and expr.endswith("'"):
-            return expr[1:-1]
-        elif expr.startswith('"') and expr.endswith('"'):
-            return expr[1:-1]
-        
-        # Handle attribute access (obj.attr)
-        if '.' in expr:
-            obj_name, attr_name = expr.split('.', 1)
-            obj = context.get(obj_name)
-            
-            if obj is None:
-                return None
-            
-            # Handle nested attributes
-            for part in attr_name.split('.'):
-                if hasattr(obj, part):
-                    obj = getattr(obj, part)
-                elif isinstance(obj, dict) and part in obj:
-                    obj = obj[part]
-                else:
-                    return None
-            
-            return obj
-        
-        # Handle variable lookup
-        return context.get(expr)
+        try:
+            # Render error template
+            return self.render_template("layouts/error", context)
+        except Exception as e:
+            logger.error(f"Error rendering error page: {str(e)}")
+            # Fallback to simple error page
+            return f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Error {error_code}</title>
+            </head>
+            <body>
+                <h1>Error {error_code}</h1>
+                <p>{message or 'An error occurred'}</p>
+            </body>
+            </html>
+            """
 
 
-# Create global template engine
-engine = TemplateEngine()
+# Create default template engine instance
+template_engine = TemplateEngine()
 
 
-def render_template(template_name, **context):
-    """
-    Render a template with context variables.
+# Module-level functions for easy access
+def render_template(template_name: str, context: Dict[str, Any] = None) -> str:
+    """Render a template with the given context.
     
     Args:
-        template_name: Name of the template file
-        **context: Context variables for template rendering
+        template_name: Template name (with or without extension)
+        context: Template variables
         
     Returns:
-        Rendered template string
+        Rendered template as string
     """
-    return engine.render_template(template_name, **context)
+    return template_engine.render_template(template_name, context or {})
 
 
-def set_template_dirs(templates_dir=None, layouts_dir=None, components_dir=None):
-    """
-    Set template directories.
+def render_component(component_name: str, **kwargs) -> str:
+    """Render a component with the given context.
     
     Args:
-        templates_dir: Base directory for templates
-        layouts_dir: Directory for layout templates
-        components_dir: Directory for component templates
+        component_name: Component name (without extension)
+        **kwargs: Component context variables
+        
+    Returns:
+        Rendered component as string
     """
-    if templates_dir:
-        engine.templates_dir = Path(templates_dir)
+    return template_engine.render_component(component_name, **kwargs)
+
+
+def render_string(template_string: str, context: Dict[str, Any] = None) -> str:
+    """Render a template string with the given context.
     
-    if layouts_dir:
-        engine.layouts_dir = Path(layouts_dir)
+    Args:
+        template_string: Template string
+        context: Template variables
+        
+    Returns:
+        Rendered template as string
+    """
+    return template_engine.render_string(template_string, context or {})
+
+
+def render_error(error_code: int, message: str = None, **kwargs) -> str:
+    """Render an error page.
     
-    if components_dir:
-        engine.components_dir = Path(components_dir)
+    Args:
+        error_code: HTTP error code (e.g., 404, 500)
+        message: Optional error message
+        **kwargs: Additional context variables
+        
+    Returns:
+        Rendered error page as string
+    """
+    return template_engine.render_error(error_code, message, **kwargs)
 
 
-def enable_cache(enabled=True):
-    """Enable or disable template caching."""
-    engine.cache_enabled = enabled
+def get_asset_url(path: str) -> str:
+    """Get the URL for an asset.
     
-    # Clear cache if disabling
-    if not enabled:
-        engine.cache = {}
-
-
-def clear_cache():
-    """Clear the template cache."""
-    engine.cache = {}
+    Args:
+        path: Asset path relative to assets directory
+        
+    Returns:
+        Asset URL with cache-busting parameter
+    """
+    return template_engine.get_asset_url(path)
 
 
 # For testing
 if __name__ == "__main__":
-    # Example template
+    # Example template string
     example_template = """
-    {% extends "main.html" %}
-    
-    {% block title %}Example Page{% endblock %}
-    
-    {% block content %}
-    <h1>{{ page_title }}</h1>
-    
-    <ul>
-    {% for item in items %}
-        <li>{{ item.name }}: {{ item.value }}</li>
-    {% endfor %}
-    </ul>
-    
-    {% if show_extra %}
-        <p>Extra content here!</p>
-    {% else %}
-        <p>No extra content.</p>
-    {% endif %}
-    {% endblock %}
-    """
-    
-    # Mock layout template
-    mock_layout = """
     <!DOCTYPE html>
     <html>
     <head>
-        <title>{% block title %}Default Title{% endblock %}</title>
+        <title>{{ page_title }}</title>
+        <link rel="stylesheet" href="{{ asset_url('css/main.css') }}">
     </head>
     <body>
         <header>
-            {% include "header.html" %}
+            {{ include_component('header', title=page_title) }}
         </header>
         
         <main>
-            {% block content %}
-            <p>Default content</p>
-            {% endblock %}
+            <h1>{{ page_title }}</h1>
+            
+            <ul>
+            {% for item in items %}
+                <li>{{ item.name }}: {{ item.value }}</li>
+            {% endfor %}
+            </ul>
+            
+            {% if show_extra %}
+                <p>Extra content here!</p>
+            {% else %}
+                <p>No extra content.</p>
+            {% endif %}
         </main>
         
         <footer>
-            {% include "footer.html" %}
+            {{ include_component('footer') }}
         </footer>
+        
+        <script src="{{ asset_url('js/main.js') }}"></script>
     </body>
     </html>
     """
-    
-    # Mock includes
-    mock_header = "<nav>Navigation</nav>"
-    mock_footer = "<p>Footer content</p>"
-    
-    # Mock loading
-    def mock_load_template(name, *args, **kwargs):
-        if name == "main.html" or name == "main":
-            return mock_layout
-        elif name == "header.html" or name == "header":
-            return mock_header
-        elif name == "footer.html" or name == "footer":
-            return mock_footer
-        else:
-            return f"<!-- Template {name} not found -->"
-    
-    # Modify engine for testing
-    engine.load_template = mock_load_template
     
     # Test context
     context = {
@@ -519,7 +389,12 @@ if __name__ == "__main__":
         "show_extra": True
     }
     
-    # Render template
-    result = render_template("example", **context)
+    # Mock file system for testing
+    template_engine.env.loader = None  # Disable file loader
     
-    print(result)
+    # Render template string
+    try:
+        result = render_string(example_template, context)
+        print(result)
+    except Exception as e:
+        print(f"Error: {e}")
