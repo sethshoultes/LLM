@@ -2,12 +2,12 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>LLM Interface</title>
     <!-- CSS -->
     {% block styles %}
     <style>
-        {% include "assets/css/main.css" %}
+        {% include "assets/css/consolidated.css" %}
     </style>
     {% endblock %}
     
@@ -20,14 +20,14 @@
     
     <h1>Portable LLM Interface</h1>
     
-    <div class="interface-container">
+    <div class="interface-container {% if rag_enabled %}rag-enabled{% endif %}">
         <!-- Sidebar - only rendered if RAG is enabled -->
         {% if rag_enabled %}
-            {% include "components/sidebar.html" %}
+            {% include "components/tabbed_sidebar/tabbed_sidebar.html" %}
         {% endif %}
         
         <div class="main-content">
-            <!-- Models card -->
+            <!-- Available models section -->
             <div class="card">
                 <h2>Available Models</h2>
                 <div id="modelList" class="model-list">Loading models...</div>
@@ -36,12 +36,6 @@
             <!-- Extension point for SIDEBAR -->
             {% block sidebar_extensions %}{% endblock %}
             
-            <!-- Model selection card -->
-            <div class="card">
-                <h2>Model Selection</h2>
-                {% include "components/model_selector.html" %}
-            </div>
-            
             <!-- Chat card -->
             <div class="card">
                 <h2>Chat</h2>
@@ -49,9 +43,7 @@
                 <!-- Extension point for MAIN_CONTROLS -->
                 {% block main_controls %}{% endblock %}
                 
-                {% if rag_enabled %}
-                {% include "components/context_bar.html" %}
-                {% endif %}
+                <!-- Context bar is now part of the tabbed sidebar -->
                 
                 {% include "components/chat_interface.html" %}
             </div>
@@ -60,6 +52,11 @@
     
     <!-- Extension point for DIALOGS -->
     {% block dialogs %}{% endblock %}
+    
+    <!-- Mobile tab bar - only rendered if RAG is enabled -->
+    {% if rag_enabled %}
+        {% include "components/mobile_tab_bar.html" %}
+    {% endif %}
     
     <!-- JavaScript -->
     {% block scripts %}
@@ -73,6 +70,11 @@
         {% include "assets/js/components.js" %}
     </script>
     
+    <!-- Consolidated RAG UI components -->
+    <script>
+        {% include "assets/js/consolidated.js" %}
+    </script>
+    
     <!-- Finally load the legacy compatibility script -->
     <script>
         {% include "assets/js/main.js" %}
@@ -84,11 +86,11 @@
     (function() {
         // Wait until DOM is fully loaded
         document.addEventListener('DOMContentLoaded', function() {
-            console.log("Initializing components");
+            // Initialize components
             
             // Only initialize if namespace exists
             if (typeof window.LLM === 'undefined' || typeof window.LLM.Components === 'undefined') {
-                console.error("LLM components not found - initialization skipped");
+                // Skip initialization if components are missing
                 return;
             }
             
@@ -114,13 +116,21 @@
                 }
                 
                 // Initialize RAG sidebar if enabled
-                if (document.body.getAttribute('data-rag-enabled') && window.LLM.Components.RAGSidebar) {
-                    window.LLM.Components.RAGSidebar.init();
+                if (document.body.getAttribute('data-rag-enabled')) {
+                    if (window.LLM.Components.RAGSidebar) {
+                        window.LLM.Components.RAGSidebar.init();
+                    }
+                    
+                    // Initialize tabbed sidebar
+                    if (window.LLM.TabbedSidebar) {
+                        window.LLM.TabbedSidebar.init();
+                    }
                 }
                 
-                console.log("Components initialized successfully");
+                // Components initialized successfully
             } catch (error) {
-                console.error("Error during component initialization:", error);
+                // Handle errors gracefully without console logs
+                document.getElementById('modelList').textContent = 'Error loading components. Please refresh the page.';
             }
         });
     })();
