@@ -1,19 +1,27 @@
-<div class="context-bar" id="contextBar" style="display: none;">
+<div class="context-bar" id="contextBar">
     <div class="context-header">
         <h3>Context Documents</h3>
         <div class="context-controls">
             <button class="secondary-btn clear-context-btn" id="clearContextBtn">Clear All</button>
             <div class="toggle-switch">
-                <label for="autoContextToggle">Auto-suggest:</label>
+                <label for="autoContextToggle">
+                    Auto-suggest:
+                    <span class="tooltip-container">
+                        <span class="tooltip-icon">?</span>
+                        <span class="tooltip-content">When enabled, the system automatically finds relevant documents for your questions.</span>
+                    </span>
+                </label>
                 <label class="switch">
-                    <input type="checkbox" id="autoContextToggle">
+                    <input type="checkbox" id="autoContextToggle" checked>
                     <span class="slider"></span>
                 </label>
             </div>
         </div>
     </div>
     
-    <div class="context-items" id="contextItems"></div>
+    <div class="context-items" id="contextItems">
+        <div class="empty-context">No documents selected. Use the checkboxes to add documents or enable Auto-suggest.</div>
+    </div>
     
     <div class="context-stats" id="contextStats">
         <div class="token-usage">
@@ -25,6 +33,8 @@
             </div>
         </div>
     </div>
+    
+    <!-- Hint text replaced with tooltip -->
 </div>
 
 <!-- Styles moved to main.css -->

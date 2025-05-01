@@ -387,6 +387,9 @@ LLM.Components = {
             const contextBar = document.getElementById('contextBar');
             if (!contextBar) return;
             
+            // Make sure the context bar is always visible
+            contextBar.style.display = 'block';
+            
             // Setup event listeners
             const clearContextBtn = document.getElementById('clearContextBtn');
             const autoContextToggle = document.getElementById('autoContextToggle');
@@ -442,10 +445,13 @@ LLM.Components = {
             // Update UI with new token counts
             this.updateTokenCounts();
             
-            // Hide context bar if empty
+            // Update the context items to show empty state message
             if (this.documents.length === 0) {
-                const contextBar = document.getElementById('contextBar');
-                if (contextBar) contextBar.style.display = 'none';
+                const contextItems = document.getElementById('contextItems');
+                if (contextItems) {
+                    contextItems.innerHTML = '<div class="empty-context">No documents selected. Use the checkboxes to add documents or enable Auto-suggest.</div>';
+                }
+                // Context bar stays visible - do not hide it
             }
         },
         
@@ -455,8 +461,12 @@ LLM.Components = {
             this.currentTokens = 0;
             this.updateUI();
             
-            const contextBar = document.getElementById('contextBar');
-            if (contextBar) contextBar.style.display = 'none';
+            // Update the context items to show empty state message
+            const contextItems = document.getElementById('contextItems');
+            if (contextItems) {
+                contextItems.innerHTML = '<div class="empty-context">No documents selected. Use the checkboxes to add documents or enable Auto-suggest.</div>';
+            }
+            // Context bar stays visible - do not hide it
         },
         
         // Update token counts from API
@@ -526,29 +536,34 @@ LLM.Components = {
             
             if (!contextItems || !tokenCount || !tokenLimit || !tokenUsed) return;
             
-            // Update context items
-            contextItems.innerHTML = '';
-            this.documents.forEach(doc => {
-                const item = document.createElement('div');
-                item.className = 'context-item';
-                
-                // Include token count if available
-                const tokenInfo = doc.tokens ? ` (${doc.tokens} tokens)` : '';
-                
-                item.innerHTML = `
-                    <div class="context-item-title" title="${doc.title}">${doc.title}${tokenInfo}</div>
-                    <div class="context-item-remove" data-id="${doc.id}">×</div>
-                `;
-                contextItems.appendChild(item);
-                
-                // Add event listener to remove button
-                const removeBtn = item.querySelector('.context-item-remove');
-                if (removeBtn) {
-                    removeBtn.addEventListener('click', () => {
-                        this.removeDocument(doc.id);
-                    });
-                }
-            });
+            if (this.documents.length === 0) {
+                // Show empty state message
+                contextItems.innerHTML = '<div class="empty-context">No documents selected. Use the checkboxes to add documents or enable Auto-suggest.</div>';
+            } else {
+                // Update context items with documents
+                contextItems.innerHTML = '';
+                this.documents.forEach(doc => {
+                    const item = document.createElement('div');
+                    item.className = 'context-item';
+                    
+                    // Include token count if available
+                    const tokenInfo = doc.tokens ? ` (${doc.tokens} tokens)` : '';
+                    
+                    item.innerHTML = `
+                        <div class="context-item-title" title="${doc.title}">${doc.title}${tokenInfo}</div>
+                        <div class="context-item-remove" data-id="${doc.id}">×</div>
+                    `;
+                    contextItems.appendChild(item);
+                    
+                    // Add event listener to remove button
+                    const removeBtn = item.querySelector('.context-item-remove');
+                    if (removeBtn) {
+                        removeBtn.addEventListener('click', () => {
+                            this.removeDocument(doc.id);
+                        });
+                    }
+                });
+            }
             
             // Update token count display
             tokenCount.textContent = this.currentTokens;
@@ -828,6 +843,16 @@ LLM.Components = {
             // Check if we have the ContextManager
             if (LLM.Components.ContextManager) {
                 LLM.Components.ContextManager.addDocument(doc);
+                
+                // Update checkbox state in the sidebar
+                const checkbox = document.getElementById(`doc-${doc.id}`);
+                if (checkbox) {
+                    checkbox.checked = true;
+                    // Add to selected documents array if not already there
+                    if (!this.selectedDocuments.includes(doc.id)) {
+                        this.selectedDocuments.push(doc.id);
+                    }
+                }
             } else if (typeof window.addToContext === 'function') {
                 // Fallback to window method
                 window.addToContext(doc);
@@ -1185,10 +1210,22 @@ LLM.Components = {
                 document.querySelectorAll('.document-checkbox').forEach(checkbox => {
                     checkbox.addEventListener('change', () => {
                         const docId = checkbox.closest('.document-item').getAttribute('data-document-id');
+                        const docItem = this.documents.find(doc => doc.id === docId);
+                        
                         if (checkbox.checked) {
                             this.selectedDocuments.push(docId);
+                            
+                            // Also add to ContextManager if available
+                            if (docItem && LLM.Components.ContextManager) {
+                                LLM.Components.ContextManager.addDocument(docItem);
+                            }
                         } else {
                             this.selectedDocuments = this.selectedDocuments.filter(id => id !== docId);
+                            
+                            // Also remove from ContextManager if available
+                            if (LLM.Components.ContextManager) {
+                                LLM.Components.ContextManager.removeDocument(docId);
+                            }
                         }
                         this.updateTokenCount();
                     });
