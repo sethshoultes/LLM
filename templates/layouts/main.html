@@ -21,9 +21,10 @@
     <h1>Portable LLM Interface</h1>
     
     <div class="interface-container {% if rag_enabled %}rag-enabled{% endif %}">
-        <!-- Sidebar - only rendered if RAG is enabled -->
+        <!-- Sidebar added through ui_extensions.py if RAG is enabled -->
         {% if rag_enabled %}
-            {% include "components/tabbed_sidebar/tabbed_sidebar.html" %}
+            <!-- Sidebar extensions go here -->
+            {% block sidebar_extensions %}{% endblock %}
         {% endif %}
         
         <div class="main-content">
@@ -124,6 +125,22 @@
                     // Initialize tabbed sidebar
                     if (window.LLM.TabbedSidebar) {
                         window.LLM.TabbedSidebar.init();
+                    }
+                    
+                    // Connect with RAG state if available
+                    if (window.ragState) {
+                        // Hook document selection events
+                        if (window.ragState.documents && window.LLM.TabbedSidebar) {
+                            window.LLM.TabbedSidebar.mockDocuments = window.ragState.documents;
+                            window.LLM.TabbedSidebar.renderDocumentList(window.ragState.documents);
+                        }
+                        
+                        // Connect project selector
+                        if (window.fetchProjects && window.populateProjectSelector) {
+                            fetchProjects().then(projects => {
+                                populateProjectSelector(projects);
+                            });
+                        }
                     }
                 }
                 

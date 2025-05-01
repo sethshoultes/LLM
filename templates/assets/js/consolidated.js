@@ -13,6 +13,7 @@ window.LLM = window.LLM || {};
 // Tabbed Sidebar Component
 LLM.TabbedSidebar = {
     selectedDocuments: [],
+    mockDocuments: [],
     
     // Utility function for screen reader announcements
     announceToScreenReader: function(message) {
@@ -40,6 +41,9 @@ LLM.TabbedSidebar = {
         this.setupEventListeners();
         this.setupMockData(); // This would be replaced with actual data in production
         
+        // Render the document list with the mock data
+        this.renderDocumentList(this.mockDocuments);
+        
         // Initialize document count
         if (LLM.Components && LLM.Components.ContextManager) {
             this.updateContextCount(LLM.Components.ContextManager.documents.length || 0);
@@ -55,10 +59,13 @@ LLM.TabbedSidebar = {
         // In production, this should fetch actual data from the server
         // For now, use sample data if no real data is available
         
-        if (LLM.Components && 
-            LLM.Components.ContextManager && 
-            LLM.Components.ContextManager.documents && 
-            LLM.Components.ContextManager.documents.length > 0) {
+        if (window.ragState && window.ragState.documents && window.ragState.documents.length > 0) {
+            // Use data from RAG state if available
+            this.mockDocuments = window.ragState.documents;
+        } else if (LLM.Components && 
+                  LLM.Components.ContextManager && 
+                  LLM.Components.ContextManager.documents && 
+                  LLM.Components.ContextManager.documents.length > 0) {
             
             // Use real data if available
             this.mockDocuments = LLM.Components.ContextManager.documents;
@@ -73,6 +80,70 @@ LLM.TabbedSidebar = {
         }
     },
     
+    renderDocumentList: function(documents) {
+        const listElement = document.getElementById('documentList');
+        if (!listElement) return;
+        
+        if (!documents || documents.length === 0) {
+            listElement.innerHTML = '<div class="empty-state">No documents found</div>';
+            return;
+        }
+        
+        let html = '';
+        documents.forEach(doc => {
+            const isSelected = this.selectedDocuments.includes(doc.id);
+            html += `
+                <div class="document-item ${isSelected ? 'selected' : ''}" data-id="${doc.id}">
+                    <div class="document-selector">
+                        <input type="checkbox" class="document-checkbox" id="doc-${doc.id}" ${isSelected ? 'checked' : ''}>
+                        <label for="doc-${doc.id}" class="document-name">${doc.title}</label>
+                    </div>
+                    <div class="document-meta">
+                        ${doc.updated_at ? new Date(doc.updated_at).toLocaleDateString() : 'Sample document'}
+                    </div>
+                    <div class="tags-list">
+                        ${(doc.tags || []).map(tag => `<span class="tag">${tag}</span>`).join('')}
+                    </div>
+                    <div class="document-actions">
+                        <button class="preview-btn" data-id="${doc.id}" title="Preview">👁️</button>
+                    </div>
+                </div>
+            `;
+        });
+        
+        listElement.innerHTML = html;
+        
+        // Attach event listeners to the new elements
+        this.attachDocumentListEventListeners();
+    },
+    
+    attachDocumentListEventListeners: function() {
+        // Add checkbox event listeners
+        document.querySelectorAll('.document-checkbox').forEach(checkbox => {
+            checkbox.addEventListener('change', e => {
+                const docId = checkbox.closest('.document-item').dataset.id;
+                if (checkbox.checked) {
+                    this.addToSelected(docId);
+                } else {
+                    this.removeFromSelected(docId);
+                }
+            });
+        });
+        
+        // Add preview button listeners
+        document.querySelectorAll('.preview-btn').forEach(btn => {
+            btn.addEventListener('click', e => {
+                e.stopPropagation();
+                const docId = btn.dataset.id;
+                if (window.viewDocument) {
+                    window.viewDocument(docId);
+                } else {
+                    alert('Document preview not available');
+                }
+            });
+        });
+    },
+    
     setupEventListeners: function() {
         const tabButtons = document.querySelectorAll('.tab-button');
         const selectAllBtn = document.getElementById('selectAllBtn');
@@ -81,6 +152,8 @@ LLM.TabbedSidebar = {
         const drawerHandle = document.getElementById('drawerHandle');
         const sidebar = document.getElementById('sidebar');
         const sidebarToggle = document.querySelector('.sidebar-toggle');
+        const documentSearch = document.getElementById('documentSearch');
+        const clearSearch = document.getElementById('clearSearch');
         
         // Add click event listeners to tab buttons
         tabButtons.forEach(button => {
@@ -129,6 +202,15 @@ LLM.TabbedSidebar = {
         
         if (addSelectedBtn) {
             addSelectedBtn.addEventListener('click', this.addSelectedToContext.bind(this));
+        }
+        
+        // Document search
+        if (documentSearch) {
+            documentSearch.addEventListener('input', this.filterDocuments.bind(this));
+        }
+        
+        if (clearSearch) {
+            clearSearch.addEventListener('click', this.clearSearch.bind(this));
         }
         
         // Mobile drawer handle
@@ -312,6 +394,36 @@ LLM.TabbedSidebar = {
                     e.preventDefault();
                 }
             }
+        }
+    },
+    
+    // Filter documents based on search query
+    filterDocuments: function() {
+        const searchInput = document.getElementById('documentSearch');
+        if (!searchInput) return;
+        
+        const query = searchInput.value.trim().toLowerCase();
+        
+        if (!query) {
+            this.renderDocumentList(this.mockDocuments);
+            return;
+        }
+        
+        const filtered = this.mockDocuments.filter(doc => {
+            const titleMatch = doc.title.toLowerCase().includes(query);
+            const tagMatch = doc.tags && doc.tags.some(tag => tag.toLowerCase().includes(query));
+            return titleMatch || tagMatch;
+        });
+        
+        this.renderDocumentList(filtered);
+    },
+    
+    // Clear search input and reset document list
+    clearSearch: function() {
+        const searchInput = document.getElementById('documentSearch');
+        if (searchInput) {
+            searchInput.value = '';
+            this.renderDocumentList(this.mockDocuments);
         }
     },
     
