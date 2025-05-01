@@ -70,6 +70,8 @@ RAG_CSS = """
     border-bottom: 1px solid #eee;
     cursor: pointer;
     font-size: 0.9rem;
+    display: flex;
+    flex-direction: column;
 }
 
 .document-item:hover {
@@ -81,14 +83,40 @@ RAG_CSS = """
     border-left: 2px solid #1890ff;
 }
 
+.document-selector {
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: 0.2rem;
+}
+
+.document-selector input[type="checkbox"] {
+    margin-right: 0.5rem;
+    margin-top: 0.2rem;
+}
+
 .document-title {
     font-weight: 500;
-    margin-bottom: 0.2rem;
+    flex: 1;
 }
 
 .document-meta {
     font-size: 0.8rem;
     color: #888;
+}
+
+.document-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 0.3rem;
+}
+
+.preview-btn {
+    background: none;
+    border: none;
+    font-size: 1rem;
+    cursor: pointer;
+    padding: 0;
+    margin-left: 0.5rem;
 }
 
 .tags-list {
@@ -145,6 +173,13 @@ RAG_CSS = """
     flex-wrap: wrap;
     gap: 0.5rem;
     margin-bottom: 0.8rem;
+}
+
+.empty-context {
+    color: #888;
+    font-style: italic;
+    font-size: 0.9rem;
+    padding: 0.5rem 0;
 }
 
 .context-item {
@@ -298,11 +333,24 @@ RAG_CSS = """
     display: flex;
     align-items: center;
     margin-bottom: 0.5rem;
+    border-top: 1px solid #eee;
+    padding-top: 0.8rem;
+    margin-top: 0.8rem !important;
 }
 
 .toggle-switch label {
     margin-bottom: 0;
     margin-right: 0.5rem;
+    font-size: 0.85rem;
+    color: #333;
+}
+
+.toggle-hint {
+    margin-top: 0.4rem;
+    font-size: 0.8rem;
+    color: #666;
+    font-style: italic;
+    width: 100%;
 }
 
 .switch {
@@ -392,10 +440,25 @@ RAG_SIDEBAR_HTML = """
 """
 
 RAG_CONTEXT_BAR_HTML = """
-<div class="context-bar" id="contextBar" style="display: none;">
+<div class="context-bar" id="contextBar">
     <div class="context-header">
         <h3>Context Documents</h3>
-        <button id="refreshTokens" class="secondary-btn small-btn" title="Refresh token count">⟳</button>
+        <div class="context-controls">
+            <button class="secondary-btn clear-context-btn" id="clearContextBtn">Clear All</button>
+            <div class="toggle-switch">
+                <label for="autoContextToggle">
+                    Auto-suggest:
+                    <span class="tooltip-container">
+                        <span class="tooltip-icon">?</span>
+                        <span class="tooltip-content">When enabled, the system automatically finds relevant documents for your questions.</span>
+                    </span>
+                </label>
+                <label class="switch">
+                    <input type="checkbox" id="autoContextToggle" checked>
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
     </div>
     <div class="context-items" id="contextItems"></div>
     
@@ -411,13 +474,7 @@ RAG_CONTEXT_BAR_HTML = """
         </div>
     </div>
     
-    <div class="toggle-switch" style="margin-top: 0.5rem;">
-        <label for="autoContextToggle">Auto-suggest context:</label>
-        <label class="switch">
-            <input type="checkbox" id="autoContextToggle">
-            <span class="slider"></span>
-        </label>
-    </div>
+    <!-- Hint text replaced with tooltip -->
 </div>
 """
 
@@ -495,7 +552,10 @@ const ragState = {
     currentChat: null,
     documents: [],
     contextDocuments: [],
-    autoSuggestContext: false
+    // Default to true, but respect saved preference if it exists
+    autoSuggestContext: localStorage.getItem('rag_auto_suggest') !== null 
+        ? localStorage.getItem('rag_auto_suggest') === 'true' 
+        : true
 };
 
 // Initialize RAG UI
@@ -518,6 +578,18 @@ function initRagUI() {
         const contextBar = document.createElement('div');
         contextBar.innerHTML = RAG_CONTEXT_BAR_HTML;
         chatHistoryElement.parentNode.insertBefore(contextBar.firstElementChild, chatHistoryElement);
+        
+        // Make sure the context bar is visible
+        const contextBarElement = document.getElementById('contextBar');
+        if (contextBarElement) {
+            contextBarElement.style.display = 'block';
+            
+            // Initialize the Auto-suggest toggle
+            const autoToggle = document.getElementById('autoContextToggle');
+            if (autoToggle) {
+                autoToggle.checked = ragState.autoSuggestContext;
+            }
+        }
     }
     
     // Add event listeners
@@ -525,6 +597,12 @@ function initRagUI() {
     
     // Load projects
     loadProjects();
+    
+    // Initialize the context bar with empty state message
+    updateContextBar();
+    
+    // Add clear all button event listener
+    document.getElementById('clearContextBtn')?.addEventListener('click', clearAllContextDocs);
 }
 
 // Setup event listeners for RAG UI
@@ -548,7 +626,12 @@ function setupRagEventListeners() {
     document.getElementById('clearSearch')?.addEventListener('click', clearSearch);
     
     // Context management
-    document.getElementById('autoContextToggle')?.addEventListener('change', toggleAutoContext);
+    const autoToggle = document.getElementById('autoContextToggle');
+    if (autoToggle) {
+        // Set initial state from saved preference
+        autoToggle.checked = ragState.autoSuggestContext;
+        autoToggle.addEventListener('change', toggleAutoContext);
+    }
     document.getElementById('refreshTokens')?.addEventListener('click', updateTokenCounts);
     
     // Monitor user input to update token counts
@@ -740,12 +823,18 @@ function renderDocumentList(documents) {
         const isSelected = ragState.contextDocuments.some(d => d.id === doc.id);
         html += `
             <div class="document-item ${isSelected ? 'selected' : ''}" data-id="${doc.id}">
-                <div class="document-title">${doc.title}</div>
+                <div class="document-selector">
+                    <input type="checkbox" class="document-checkbox" id="doc-${doc.id}" ${isSelected ? 'checked' : ''}>
+                    <div class="document-title">${doc.title}</div>
+                </div>
                 <div class="document-meta">
                     ${new Date(doc.updated_at).toLocaleDateString()}
                 </div>
                 <div class="tags-list">
                     ${(doc.tags || []).map(tag => `<span class="tag">${tag}</span>`).join('')}
+                </div>
+                <div class="document-actions">
+                    <button class="preview-btn" data-id="${doc.id}" title="Preview">👁️</button>
                 </div>
             </div>
         `;
@@ -753,9 +842,43 @@ function renderDocumentList(documents) {
     
     listElement.innerHTML = html;
     
-    // Add click event listeners
+    // Add click event listeners for document view
     document.querySelectorAll('.document-item').forEach(item => {
-        item.addEventListener('click', () => viewDocument(item.dataset.id));
+        item.addEventListener('click', (e) => {
+            // Only trigger view if not clicking on checkbox or preview button
+            if (!e.target.closest('.document-checkbox') && !e.target.closest('.preview-btn')) {
+                viewDocument(item.dataset.id);
+            }
+        });
+    });
+    
+    // Add change listeners for checkboxes
+    document.querySelectorAll('.document-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', (e) => {
+            e.stopPropagation(); // Prevent triggering the document click event
+            const docId = checkbox.closest('.document-item').dataset.id;
+            const doc = ragState.documents.find(d => d.id === docId);
+            
+            if (checkbox.checked) {
+                // Add to context documents if not already there
+                if (!ragState.contextDocuments.some(d => d.id === docId) && doc) {
+                    ragState.contextDocuments.push(doc);
+                    updateContextBar();
+                }
+            } else {
+                // Remove from context documents
+                removeFromContext(docId);
+            }
+        });
+    });
+    
+    // Add preview button handlers
+    document.querySelectorAll('.preview-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent triggering the document click event
+            const docId = btn.dataset.id;
+            viewDocument(docId);
+        });
     });
 }
 
@@ -764,22 +887,26 @@ function updateContextBar() {
     const contextItems = document.getElementById('contextItems');
     if (!contextBar || !contextItems) return;
     
-    if (ragState.contextDocuments.length === 0) {
-        contextBar.style.display = 'none';
-        return;
-    }
-    
+    // Always show the context bar, even when empty
     contextBar.style.display = 'block';
     
+    // Generate HTML for context documents
     let html = '';
-    ragState.contextDocuments.forEach(doc => {
-        html += `
-            <div class="context-item" data-id="${doc.id}">
-                ${doc.title}
-                <span class="remove-context" data-id="${doc.id}">×</span>
-            </div>
-        `;
-    });
+    
+    if (ragState.contextDocuments.length === 0) {
+        // Show an empty state message in the context items area
+        html = '<div class="empty-context">No documents selected. Use the checkboxes to add documents or enable Auto-suggest.</div>';
+    } else {
+        // Add document items
+        ragState.contextDocuments.forEach(doc => {
+            html += `
+                <div class="context-item" data-id="${doc.id}">
+                    ${doc.title}
+                    <span class="remove-context" data-id="${doc.id}">×</span>
+                </div>
+            `;
+        });
+    }
     
     contextItems.innerHTML = html;
     
@@ -1089,6 +1216,13 @@ function addCurrentDocToContext() {
     if (!ragState.contextDocuments.some(d => d.id === docId)) {
         ragState.contextDocuments.push(doc);
         updateContextBar();
+        
+        // Also check the checkbox in the document list
+        const checkbox = document.querySelector(`input[id="doc-${docId}"]`);
+        if (checkbox) {
+            checkbox.checked = true;
+        }
+        
         renderDocumentList(ragState.documents); // Update selection state
     }
     
@@ -1101,12 +1235,21 @@ function removeFromContext(docId) {
     renderDocumentList(ragState.documents); // Update selection state
 }
 
+// Function to clear all context documents
+function clearAllContextDocs() {
+    ragState.contextDocuments = []; // Empty the array
+    updateContextBar();
+    renderDocumentList(ragState.documents); // Update selection state
+}
+
 function editCurrentDocument() {
     alert('Document editing not implemented in this demo');
 }
 
 function toggleAutoContext(e) {
     ragState.autoSuggestContext = e.target.checked;
+    // Save preference to localStorage
+    localStorage.setItem('rag_auto_suggest', e.target.checked);
 }
 
 async function sendMessageWithContext() {
