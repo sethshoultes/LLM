@@ -1,0 +1,12 @@
+{
+  "timestamp": 1746070369.6744199,
+  "document_count": 1,
+  "model": "all-MiniLM-L6-v2",
+  "embedding_dim": 384,
+  "documents": {
+    "7fca6f1d-79e7-4c54-acb3-4bcda5041808": {
+      "updated_at": "2025-04-30T18:30:24.159805",
+      "title": "Seth Shoultes Info"
+    }
+  }
+}

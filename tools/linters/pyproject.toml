@@ -1,0 +1,71 @@
+# Python project configuration for linters
+
+[tool.black]
+line-length = 100
+target-version = ['py39']
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | _build
+  | buck-out
+  | build
+  | dist
+  | LLM-MODELS
+)/
+'''
+
+[tool.pylint.main]
+fail-under = 9.0
+ignore = ["CVS", "LLM-MODELS"]
+ignore-patterns = ["^\\.#"]
+jobs = 0
+limit-inference-results = 100
+persistent = true
+py-version = "3.9"
+recursive = true
+suggestion-mode = true
+
+[tool.pylint.messages_control]
+disable = [
+    "format",
+    "missing-docstring",
+    "invalid-name",
+    "no-member",
+    "too-many-arguments",
+    "too-many-locals",
+    "too-many-instance-attributes",
+    "too-many-public-methods",
+    "too-few-public-methods",
+    "fixme",
+    "duplicate-code",
+]
+
+[tool.pylint.reports]
+output-format = "text"
+reports = false
+score = true
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+check_untyped_defs = true
+disallow_untyped_decorators = false
+no_implicit_optional = true
+strict_optional = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+
+[tool.isort]
+profile = "black"
+line_length = 100

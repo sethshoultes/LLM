@@ -50,6 +50,8 @@ The RAG implementation provides the following API endpoints:
 ### Search
 
 - `GET /api/projects/{id}/search?q={query}` - Search documents in a project
+- `GET /api/projects/{id}/search?q={query}&search_type=hybrid` - Search documents using hybrid search
+- `GET /api/projects/{id}/search?q={query}&search_type=semantic` - Search documents using semantic search
 - `GET /api/projects/{id}/suggest?q={query}` - Get document suggestions for a query
 
 ### Chat
@@ -102,9 +104,21 @@ const document = await result.json();
 ### Search Documents
 
 ```javascript
-// Search for documents in a project
+// Basic keyword search
 const result = await fetch(`/api/projects/${projectId}/search?q=research+methodology`);
 const searchResults = await result.json();
+
+// Hybrid search (combining keyword and semantic search)
+const hybridResult = await fetch(`/api/projects/${projectId}/search?q=research+methodology&search_type=hybrid`);
+const hybridSearchResults = await hybridResult.json();
+
+// Semantic search only (using embeddings for meaning-based search)
+const semanticResult = await fetch(`/api/projects/${projectId}/search?q=research+methodology&search_type=semantic`);
+const semanticSearchResults = await semanticResult.json();
+
+// Hybrid search with custom weights
+const customResult = await fetch(`/api/projects/${projectId}/search?q=research+methodology&search_type=hybrid&semantic_weight=0.7&keyword_weight=0.3`);
+const customSearchResults = await customResult.json();
 ```
 
 ### Send Message with Context
@@ -151,6 +165,67 @@ console.log(`Total tokens: ${tokenInfo.total_tokens}, Available: ${tokenInfo.ava
 3. **Monitor token usage** - Watch the token visualization to avoid context window overflow
 4. **Use auto-suggest** - Enable auto-suggestion for relevant context documents
 5. **Chunk large documents** - Break very large documents into smaller, focused pieces
+6. **Clear caches periodically** - Use the cache clearing utility when you notice issues with context
+7. **Restart after significant changes** - Restart the system after adding many documents or clearing caches
+
+## Troubleshooting
+
+### Clearing Caches
+
+If you experience issues with context not being properly incorporated, or if old context seems to be mixing with new documents, you may need to clear the system caches:
+
+```bash
+# Clear all caches
+./clear_caches.sh
+
+# Restart the system
+./llm.sh --rag
+```
+
+You can also selectively clear specific caches:
+
+```bash
+# Clear only embedding caches
+python3 scripts/clear_caches.py --embeddings
+
+# Clear Python cache files
+python3 scripts/clear_caches.py --python
+
+# Clear model caches
+python3 scripts/clear_caches.py --models
+```
+
+## Implementation Details
+
+The RAG implementation is built on a modular architecture:
+
+- Documents are stored as markdown files with YAML frontmatter for metadata
+- No database is required; everything is file-based for portability
+- Multiple search options available:
+  - TF-IDF algorithm for keyword-based search
+  - Semantic embedding search using sentence-transformers
+  - Hybrid search combining both approaches for better results
+- Embeddings are cached to disk for performance
+- Robust document handling with support for various document types (string, dictionary, object)
+- Smart context integration ensures document content is properly incorporated into model responses
+- The system extends the existing interface rather than replacing it
+
+## Search Capabilities
+
+Three search methods are available, each with different strengths:
+
+- **Keyword Search**: Traditional TF-IDF search for exact term matching
+  - Pros: Fast, lightweight, no additional dependencies
+  - Cons: Might miss semantically related content, sensitive to vocabulary
+  
+- **Semantic Search**: Embedding-based search using sentence-transformers
+  - Pros: Understands meaning beyond keywords, finds conceptually related content
+  - Cons: Requires more RAM, initial embedding generation is slower
+  
+- **Hybrid Search**: Combines keyword and semantic approaches
+  - Pros: Best overall results, balances precision with semantic understanding
+  - Cons: Most resource-intensive option
+  - Customizable weights: Adjust semantic_weight and keyword_weight parameters to fine-tune results
 
 ## Advanced Customization
 
@@ -158,4 +233,13 @@ The RAG implementation can be extended by:
 
 1. Modifying `/Volumes/LLM/rag_support/api_extensions.py` for API customization
 2. Updating `/Volumes/LLM/rag_support/ui_extensions.py` for UI changes
-3. Enhancing `/Volumes/LLM/rag_support/utils/search.py` for improved search algorithms
+3. Enhancing `/Volumes/LLM/rag_support/utils/search.py` for keyword search algorithms
+4. Customizing `/Volumes/LLM/rag_support/utils/hybrid_search.py` for semantic and hybrid search
+
+## Limitations
+
+- First-time embedding generation may be slow for large document collections
+- Semantic search requires additional RAM for the embedding model
+- Hybrid search combines strengths of both approaches but uses more resources
+- Context size is limited by your model's context window
+- Embedding model quality impacts semantic search results

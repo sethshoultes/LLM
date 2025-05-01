@@ -10,6 +10,7 @@ try:
 except ImportError:
     # Fallback if the import fails
     import os
+
     SCRIPT_DIR = Path(__file__).resolve().parent
     BASE_DIR = SCRIPT_DIR.parent
     # Use environment variable if available
@@ -1365,48 +1366,50 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 """
 
+
 # Function to get extension point content
 def get_rag_ui_extensions():
     """Get the RAG UI extensions for each extension point
-    
+
     Returns a dictionary with extension point names as keys and content as values
     """
     extensions = {
-        "HEAD": f'<style>{RAG_CSS}</style>',
+        "HEAD": f"<style>{RAG_CSS}</style>",
         "SIDEBAR": RAG_SIDEBAR_HTML,
         "MAIN_CONTROLS": RAG_CONTEXT_BAR_HTML,
         "DIALOGS": RAG_DIALOGS_HTML,
-        "SCRIPTS": f'<script>{RAG_JAVASCRIPT}</script>'
+        "SCRIPTS": f"<script>{RAG_JAVASCRIPT}</script>",
     }
-    
+
     return extensions
+
 
 # Function to get HTML with RAG extensions
 def get_extended_html_template():
     """Get the HTML template with RAG extensions
-    
+
     This function modifies the original HTML template to add RAG support
     without duplicating the entire interface
     """
     from scripts.quiet_interface import HTML_TEMPLATE
-    
+
     # Load original template
     html = HTML_TEMPLATE
-    
+
     # Get extensions
     extensions = get_rag_ui_extensions()
-    
+
     # Apply extensions to template
     for point, content in extensions.items():
-        marker = f'<!-- EXTENSION_POINT: {point} -->'
-        
+        marker = f"<!-- EXTENSION_POINT: {point} -->"
+
         # For the SCRIPTS extension point, wrap in proper script tags
         if point == "SCRIPTS":
             # Properly escape any problematic JavaScript characters
             # Ensure the script content is properly formatted
-            escaped_content = content.replace('${', r'$\{').replace('`', r'\`')
-            html = html.replace(marker, f'{marker}\n{escaped_content}')
+            escaped_content = content.replace("${", r"$\{").replace("`", r"\`")
+            html = html.replace(marker, f"{marker}\n{escaped_content}")
         else:
-            html = html.replace(marker, f'{marker}\n{content}')
-    
+            html = html.replace(marker, f"{marker}\n{content}")
+
     return html

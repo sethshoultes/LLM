@@ -3,9 +3,9 @@
 
 import os
 import sys
-import http.server
 import socketserver
 import json
+import http.server
 import urllib.parse
 from pathlib import Path
 import threading
@@ -793,7 +793,6 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                     rag_support.init_directories()
                     
                     # Import API handler
-                    import rag_support.api_extensions
                     importlib.reload(rag_support.api_extensions)
                     from rag_support.api_extensions import api_handler
                     
@@ -969,7 +968,6 @@ class RequestHandler(http.server.SimpleHTTPRequestHandler):
                     rag_support.init_directories()
                     
                     # Import API handler
-                    import rag_support.api_extensions
                     importlib.reload(rag_support.api_extensions)
                     from rag_support.api_extensions import api_handler
                     
