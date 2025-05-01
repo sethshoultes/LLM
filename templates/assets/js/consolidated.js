@@ -824,14 +824,39 @@ LLM.MobileNavigation = {
 
 // Initialize all components when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize tabbed sidebar
-    LLM.TabbedSidebar.init();
+    // Check if we're in a context with RAG enabled
+    const isRagEnabled = document.body.hasAttribute('data-rag-enabled');
     
-    // Initialize document reordering
-    LLM.DocumentReorder.init();
-    
-    // Initialize mobile navigation (only on mobile devices)
-    if (window.innerWidth < 768) {
-        LLM.MobileNavigation.init();
+    if (isRagEnabled) {
+        // RAG is enabled, initializing components
+        
+        // Initialize tabbed sidebar
+        if (LLM.TabbedSidebar) {
+            LLM.TabbedSidebar.init();
+        }
+        
+        // Initialize document reordering
+        if (LLM.DocumentReorder) {
+            LLM.DocumentReorder.init();
+        }
+        
+        // Initialize mobile navigation (only on mobile devices)
+        if (window.innerWidth < 768 && LLM.MobileNavigation) {
+            LLM.MobileNavigation.init();
+        }
+        
+        // Connect to existing RAG state if available
+        if (window.ragState && window.ragState.documents && LLM.TabbedSidebar) {
+            // Hook document selection events
+            LLM.TabbedSidebar.mockDocuments = window.ragState.documents;
+            LLM.TabbedSidebar.renderDocumentList(window.ragState.documents);
+            
+            // Connect project selector if needed
+            if (window.fetchProjects && window.populateProjectSelector) {
+                fetchProjects().then(projects => {
+                    populateProjectSelector(projects);
+                });
+            }
+        }
     }
 });

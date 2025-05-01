@@ -1451,7 +1451,6 @@ def get_rag_ui_extensions():
     """
     extensions = {
         "HEAD": f"<style>{RAG_CSS}</style>",
-        "SIDEBAR_EXTENSIONS": RAG_SIDEBAR_HTML,
         "MAIN_CONTROLS": RAG_CONTEXT_BAR_HTML,
         "DIALOGS": RAG_DIALOGS_HTML,
         "SCRIPTS": f"<script>{RAG_JAVASCRIPT}</script>",
