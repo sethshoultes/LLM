@@ -16,6 +16,7 @@ from typing import List, Dict, Any, Optional, Union, Set
 
 # Import from core modules
 from core.logging import get_logger
+from core.utils import timer
 
 # Import from RAG modules
 from rag.documents import Document, DocumentCollection
@@ -594,15 +595,62 @@ class ProjectManager:
                 document = result.document
 
                 # Create result dictionary
-                doc_dict = {
-                    "id": document.id,
-                    "title": document.title,
-                    "preview": document.get_preview(200),
-                    "created_at": document.created_at,
-                    "updated_at": document.updated_at,
-                    "tags": document.tags,
-                    "score": result.score,
-                }
+                # Handle both Document objects and dictionaries
+                if hasattr(document, 'id'):
+                    # Document object
+                    doc_dict = {
+                        "id": document.id,
+                        "title": document.title,
+                        "preview": document.get_preview(200),
+                        "created_at": document.created_at,
+                        "updated_at": document.updated_at,
+                        "tags": document.tags,
+                        "score": result.score,
+                    }
+                else:
+                    # Dictionary (string) document or SearchResult object
+                    # For SearchResult object, try to get ID from document attribute
+                    if hasattr(result, 'document') and hasattr(result.document, 'id'):
+                        doc_id = result.document.id
+                    elif hasattr(result, 'document_id'):
+                        doc_id = result.document_id
+                    else:
+                        doc_id = str(uuid.uuid4())
+                    
+                    # Handle different document types (dict, string, or other)
+                    if isinstance(document, dict):
+                        # Dictionary document
+                        doc_dict = {
+                            "id": doc_id,
+                            "title": document.get("title", "Untitled"),
+                            "preview": document.get("content", "")[:200] + "..." if document.get("content") else "",
+                            "created_at": document.get("created_at", ""),
+                            "updated_at": document.get("updated_at", ""),
+                            "tags": document.get("tags", []),
+                            "score": result.score,
+                        }
+                    elif isinstance(document, str):
+                        # String document
+                        doc_dict = {
+                            "id": doc_id,
+                            "title": "Untitled",
+                            "preview": document[:200] + "..." if document else "",
+                            "created_at": "",
+                            "updated_at": "",
+                            "tags": [],
+                            "score": result.score,
+                        }
+                    else:
+                        # Other object type, try to access attributes directly
+                        doc_dict = {
+                            "id": doc_id,
+                            "title": getattr(document, "title", "Untitled"),
+                            "preview": str(getattr(document, "content", ""))[:200] + "..." if hasattr(document, "content") else "",
+                            "created_at": getattr(document, "created_at", ""),
+                            "updated_at": getattr(document, "updated_at", ""),
+                            "tags": getattr(document, "tags", []),
+                            "score": result.score,
+                        }
 
                 results.append(doc_dict)
 

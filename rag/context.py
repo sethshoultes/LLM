@@ -111,7 +111,7 @@ class ContextManager:
                 # Include full document
                 selected_docs.append(
                     {
-                        "id": doc.get("id"),
+                        "id": doc.get("id", f"doc_{len(selected_docs)}"),
                         "title": doc.get("title", "Document"),
                         "content": doc.get("content", ""),
                         "tokens": doc_tokens,
@@ -141,7 +141,7 @@ class ContextManager:
 
                         selected_docs.append(
                             {
-                                "id": doc.get("id"),
+                                "id": doc.get("id", f"doc_{len(selected_docs)}"),
                                 "title": doc.get("title", "Document"),
                                 "content": truncated_content,
                                 "tokens": total_tokens,
@@ -253,6 +253,13 @@ class ContextManager:
         Returns:
             Tuple of (system prompt with context, document metadata list)
         """
+        # Log document information for debugging
+        logger.debug(f"Preparing context from {len(documents)} documents for query: {query}")
+        for i, doc in enumerate(documents):
+            doc_id = doc.get("id", f"doc_{i}")
+            doc_title = doc.get("title", "Unknown")
+            logger.debug(f"Document {i+1}: ID={doc_id}, Title={doc_title}")
+            
         # Determine context window and calculate available tokens
         allocation = token_manager.allocate_context_budget(
             context_window=self.context_window,
@@ -265,7 +272,13 @@ class ContextManager:
         logger.info(f"Available tokens for context: {available_tokens}")
 
         if available_tokens <= 0 or not documents:
+            logger.warning("No available tokens or empty documents list - returning unmodified system message")
             return system_message, []
+
+        # Ensure each document has an ID
+        for i, doc in enumerate(documents):
+            if not doc.get("id"):
+                doc["id"] = f"doc_{i}"
 
         # Select documents based on relevance and token budget
         selected_docs = self.select_documents(
@@ -286,8 +299,10 @@ class ContextManager:
                 full_system_message = f"{system_message}\n\n{context_text}"
             else:
                 full_system_message = context_text
+            logger.debug(f"Added context to system prompt: {len(context_metadata)} documents, {available_tokens} tokens")
         else:
             full_system_message = system_message
+            logger.warning("No context was generated - returning unmodified system message")
 
         return full_system_message, context_metadata
 

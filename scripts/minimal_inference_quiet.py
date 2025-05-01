@@ -19,6 +19,60 @@ class SimpleModelManager:
     
     def __init__(self):
         self.models = {}
+        self.optimized_params = self._get_optimized_params()
+    
+    def _get_optimized_params(self):
+        """Get optimized parameters based on system capabilities"""
+        import platform
+        import multiprocessing
+        
+        # Default parameters
+        params = {
+            "n_threads": 4,          # Default: Use 4 threads
+            "n_gpu_layers": 0,       # Default: No GPU acceleration
+            "n_batch": 512,          # Default batch size
+            "n_ctx": 2048            # Default context size
+        }
+        
+        try:
+            # Get CPU information
+            cpu_count = multiprocessing.cpu_count()
+            params["n_threads"] = max(4, min(cpu_count - 2, 12))  # Use CPU count - 2, capped at 12
+            
+            # Check for GPU - this is a simple check that works for macOS
+            if platform.system() == "Darwin" and hasattr(platform, "mac_ver"):
+                mac_version = platform.mac_ver()[0]
+                if int(mac_version.split('.')[0]) >= 11:  # macOS Big Sur and newer
+                    # Apple Silicon Macs or newer Intel Macs with Metal support
+                    if "Apple M" in platform.processor() or platform.processor() == "arm":
+                        params["n_gpu_layers"] = 64  # Apple Silicon - offload many layers
+                    else:
+                        params["n_gpu_layers"] = 32  # Intel Mac - be more conservative
+            
+            # Memory-based optimizations
+            try:
+                import psutil
+                memory_gb = psutil.virtual_memory().total / (1024**3)  # Convert to GB
+                
+                if memory_gb >= 32:  # High memory system
+                    params["n_batch"] = 1024
+                    params["n_ctx"] = 4096  # Allow larger context window
+                elif memory_gb >= 16:  # Medium memory system
+                    params["n_batch"] = 512
+                    params["n_ctx"] = 2048
+                else:  # Low memory system
+                    params["n_batch"] = 256
+                    params["n_ctx"] = 1024
+            except ImportError:
+                # If psutil is not available, use conservative defaults
+                pass
+        
+        except Exception as e:
+            print(f"Error determining system capabilities: {e}")
+            # Use conservative defaults if we can't determine system capabilities
+        
+        print(f"Using optimized parameters: {params}")
+        return params
         
     def find_models(self):
         """Find all model files in the directory structure"""
@@ -110,11 +164,13 @@ class SimpleModelManager:
                 try:
                     from llama_cpp import Llama
                     
-                    # Load the model with reasonable defaults
+                    # Load the model with optimized parameters
                     model = Llama(
                         model_path=full_path,
-                        n_ctx=2048,        # Context window - restored to default
-                        n_batch=512        # Batch size
+                        n_ctx=self.optimized_params["n_ctx"],
+                        n_batch=self.optimized_params["n_batch"],
+                        n_threads=self.optimized_params["n_threads"],
+                        n_gpu_layers=self.optimized_params["n_gpu_layers"]
                     )
                     
                     self.models[model_path] = {
@@ -139,11 +195,13 @@ class SimpleModelManager:
                 try:
                     from llama_cpp import Llama
                     
-                    # Load the model with reasonable defaults
+                    # Load the model with optimized parameters
                     model = Llama(
                         model_path=full_path,
-                        n_ctx=2048,        # Context window - restored to default
-                        n_batch=512,       # Batch size
+                        n_ctx=self.optimized_params["n_ctx"],
+                        n_batch=self.optimized_params["n_batch"],
+                        n_threads=self.optimized_params["n_threads"],
+                        n_gpu_layers=self.optimized_params["n_gpu_layers"],
                         legacy=True        # Required for GGML models
                     )
                     
@@ -242,11 +300,13 @@ class SimpleModelManager:
                         full_prompt = f"<|user|>\n{prompt}</s>\n<|assistant|>\n"
                 # For Mistral, we use a specific format
                 elif "mistral" in model_path.lower():
-                    # Don't explicitly add <s> token here - the model's chat template will add it
+                    # Explicitly add <s> token for Mistral models
                     if system_prompt:
-                        full_prompt = f"[INST] {system_prompt}\n\n{prompt} [/INST]"
+                        full_prompt = f"<s>[INST] {system_prompt}\n\n{prompt} [/INST]"
+                        # Log the first part of the system prompt for debugging
+                        print(f"Using system prompt with context. First 100 chars: {system_prompt[:100]}...")
                     else:
-                        full_prompt = f"[INST] {prompt} [/INST]"
+                        full_prompt = f"<s>[INST] {prompt} [/INST]"
                 # For Llama models
                 elif "llama" in model_path.lower():
                     if system_prompt:
@@ -404,6 +464,28 @@ class SimpleModelManager:
         import gc
         gc.collect()
         return True
+        
+    def unload_other_models(self, keep_model_path=None):
+        """Unload all models except the specified one to free memory"""
+        if not keep_model_path:
+            return self.unload_all_models()
+            
+        kept_model = None
+        if keep_model_path in self.models:
+            kept_model = self.models[keep_model_path]
+            
+        # Clear all models
+        self.models.clear()
+        
+        # Add back the kept model if it exists
+        if kept_model:
+            self.models[keep_model_path] = kept_model
+            
+        # Force garbage collection
+        import gc
+        gc.collect()
+        
+        return True
 
 
 # Create a global model manager instance
@@ -470,11 +552,8 @@ def format_conversation_history(self, messages, system_prompt="", model_path="")
         formatted_messages.append("<|assistant|>")
         
     elif is_mistral:
-        # Mistral format
-        formatted_content = ""
-        
-        # Remove explicit start token - model's chat template will add it
-        # This prevents the "duplicate leading <s>" warning
+        # Mistral format - explicitly add <s> token
+        formatted_content = "<s>"
         
         # Process messages in pairs (user + assistant)
         for i in range(0, len(messages), 2):
@@ -564,8 +643,12 @@ def list_models():
     """List all available models"""
     return model_manager.find_models()
 
-def load_model(model_path):
+def load_model(model_path, unload_others=True):
     """Load a model by path"""
+    # If requested, unload other models first to free memory
+    if unload_others:
+        model_manager.unload_other_models(model_path)
+    
     return model_manager.load_model(model_path)
 
 def generate(model_path, prompt, system_prompt="", max_tokens=512, temperature=0.7, 
@@ -601,11 +684,7 @@ def generate_with_history(model_path, messages, system_prompt="", max_tokens=512
             model_path=model_path
         )
         
-        # Check for duplicate <s> tokens in Mistral models
-        if "mistral" in model_path.lower() and formatted_prompt.count("<s>") > 1:
-            print("WARNING: Detected duplicate <s> tokens in Mistral conversation history. Fixing...")
-            # Keep only the first <s> token by removing all and adding one back at the beginning
-            formatted_prompt = "<s>" + formatted_prompt.replace("<s>", "")
+        # No need to check for duplicate <s> tokens since we now handle them properly
         
         print(f"Generating with conversation history: {formatted_prompt[:100]}...")
         
@@ -716,7 +795,27 @@ def unload_model(model_path):
 
 def unload_all():
     """Unload all models"""
-    return model_manager.unload_all_models()
+    import gc
+    result = model_manager.unload_all_models()
+    
+    # Additional memory cleanup
+    gc.collect()
+    
+    # On platforms that support it, try to release memory back to the OS
+    try:
+        import ctypes
+        if hasattr(ctypes, 'CDLL'):
+            try:
+                # On macOS/Linux
+                libc = ctypes.CDLL(None)
+                if hasattr(libc, 'malloc_trim'):
+                    libc.malloc_trim(0)
+            except:
+                pass
+    except:
+        pass
+        
+    return result
 
 # Test functionality if script is run directly
 if __name__ == "__main__":

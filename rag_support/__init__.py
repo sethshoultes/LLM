@@ -55,5 +55,12 @@ try:
 except ImportError as e:
     print(f"Warning: Could not import api_extensions: {e}")
 
+# Import hybrid_search module
+try:
+    from .utils.hybrid_search import hybrid_search
+except ImportError as e:
+    print(f"Warning: Could not import hybrid_search: {e}")
+    hybrid_search = None
+
 # Export BASE_DIR and key modules for other modules
-__all__ = ["__version__", "BASE_DIR", "api_extensions"]
+__all__ = ["__version__", "BASE_DIR", "api_extensions", "hybrid_search"]

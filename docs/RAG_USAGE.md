@@ -165,6 +165,35 @@ console.log(`Total tokens: ${tokenInfo.total_tokens}, Available: ${tokenInfo.ava
 3. **Monitor token usage** - Watch the token visualization to avoid context window overflow
 4. **Use auto-suggest** - Enable auto-suggestion for relevant context documents
 5. **Chunk large documents** - Break very large documents into smaller, focused pieces
+6. **Clear caches periodically** - Use the cache clearing utility when you notice issues with context
+7. **Restart after significant changes** - Restart the system after adding many documents or clearing caches
+
+## Troubleshooting
+
+### Clearing Caches
+
+If you experience issues with context not being properly incorporated, or if old context seems to be mixing with new documents, you may need to clear the system caches:
+
+```bash
+# Clear all caches
+./clear_caches.sh
+
+# Restart the system
+./llm.sh --rag
+```
+
+You can also selectively clear specific caches:
+
+```bash
+# Clear only embedding caches
+python3 scripts/clear_caches.py --embeddings
+
+# Clear Python cache files
+python3 scripts/clear_caches.py --python
+
+# Clear model caches
+python3 scripts/clear_caches.py --models
+```
 
 ## Implementation Details
 
@@ -177,6 +206,8 @@ The RAG implementation is built on a modular architecture:
   - Semantic embedding search using sentence-transformers
   - Hybrid search combining both approaches for better results
 - Embeddings are cached to disk for performance
+- Robust document handling with support for various document types (string, dictionary, object)
+- Smart context integration ensures document content is properly incorporated into model responses
 - The system extends the existing interface rather than replacing it
 
 ## Search Capabilities

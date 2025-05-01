@@ -37,7 +37,7 @@ if str(scripts_dir) not in sys.path:
     sys.path.append(str(scripts_dir))
 
 # Import RAG utilities
-from rag_support.utils import project_manager
+from rag_support.utils.project_manager import project_manager
 from rag_support.utils.search import search_engine
 
 try:
@@ -70,10 +70,30 @@ except ImportError:
 
 # Import web API modules
 try:
+    from web.api.responses import error_response, success_response
     HAS_WEB_API = True
 except ImportError:
     HAS_WEB_API = False
     logger.warning("Could not import web.api modules. Using legacy response formatting.")
+    
+    # Define fallback functions for error_response and success_response
+    def error_response(error, detail=None, code=None, status_code=500):
+        """Fallback implementation for error_response."""
+        response = {"error": error, "status": status_code}
+        if detail:
+            response["detail"] = detail
+        if code:
+            response["code"] = code
+        return status_code, response
+    
+    def success_response(data, message=None, meta=None):
+        """Fallback implementation for success_response."""
+        response = {"status": "success", "data": data}
+        if message:
+            response["message"] = message
+        if meta:
+            response["meta"] = meta
+        return 200, response
 
 
 class RagApiHandler:
@@ -1083,7 +1103,7 @@ class RagApiHandler:
 
             # Load context documents
             start_time = time.time()
-            context_content = ""
+            system_prompt = "You are a helpful assistant."
             context_metadata = []
             total_context_tokens = 0
 
@@ -1098,38 +1118,53 @@ class RagApiHandler:
                             documents.append(doc)
 
                     # Prepare context with token budget
-                    system_prompt = ""
-                    message_history = [{"role": "user", "content": content}]
+                    # Only use the current message for context preparation to avoid leaking chat history
+                    current_message = {"role": "user", "content": content}
+                    message_history = [current_message]
 
-                    context_text, context_info = context_manager.prepare_context_for_prompt(
+                    # Use the context manager to prepare a proper system prompt with context
+                    # and ensure no previous chat context leaks in
+                    system_prompt, context_info = context_manager.prepare_context_for_prompt(
                         documents=documents,
                         query=content,
-                        system_message=system_prompt,
+                        system_message="You are a helpful assistant.",
                         messages=message_history,
                     )
+                    
+                    # Log context integration for debugging
+                    logger.debug(f"Prepared context from {len(documents)} documents for query: {content[:50]}...")
 
-                    context_content = context_text
                     context_metadata = context_info
-                    total_context_tokens = sum(doc["tokens"] for doc in context_info)
+                    total_context_tokens = sum(doc.get("tokens", 0) for doc in context_info)
+                    
+                    logger.debug(f"Using RAG context: {total_context_tokens} tokens in {len(documents)} documents")
                 else:
-                    # Legacy implementation
+                    # Generate context with proper formatting
+                    formatted_contexts = []
                     for doc_id in context_docs:
                         doc = project_manager.get_document(project_id, doc_id)
                         if doc:
                             # Prepare document content
                             doc_title = doc.get("title", "Document")
                             doc_content = doc.get("content", "")
-                            doc_text = f"# {doc_title}\n\n{doc_content}\n\n"
+                            doc_text = f"## {doc_title}\n\n{doc_content}\n\n"
 
                             # Estimate tokens for this document
                             doc_tokens = search_engine.estimate_token_count(doc_text)
                             total_context_tokens += doc_tokens
 
-                            # Add document to context
-                            context_content += doc_text
+                            # Add document to formatted contexts
+                            formatted_contexts.append(doc_text)
                             context_metadata.append(
                                 {"id": doc_id, "title": doc_title, "tokens": doc_tokens}
                             )
+                    
+                    # Combine all formatted contexts with the system prompt
+                    if formatted_contexts:
+                        context_content = "\n".join(formatted_contexts)
+                        system_prompt = f"You are a helpful assistant.\n\nUse the following information to answer the user's question:\n\n{context_content}"
+                        
+                    logger.debug(f"Using formatted context: {total_context_tokens} tokens in {len(formatted_contexts)} documents")
 
             # Get AI response by connecting to the LLM generation code
             try:
@@ -1145,13 +1180,7 @@ class RagApiHandler:
                     else:
                         raise ValueError("No models available and no model specified")
 
-                # Prepare system message with context
-                system_prompt = "You are a helpful assistant."
-                if context_content:
-                    system_prompt += (
-                        "\n\nUse the following information to answer the user's question:\n\n"
-                        + context_content
-                    )
+                # System prompt is already prepared with context above
 
                 # Generate response
                 generation_start = time.time()

@@ -73,10 +73,19 @@ class EnhancedSearch:
             # Import here to avoid circular imports
             from rag.search import SearchEngine
             from rag.indexer import TfidfIndex
-
-            self.search_engine = SearchEngine(index=TfidfIndex())
+            from rag.storage import FileSystemStorage
+            
+            # Use a cache directory for the search engine storage
+            cache_dir = BASE_DIR / "rag_support" / "cache" / "embeddings"
+            cache_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Initialize search engine with proper storage directory
+            self.search_engine = SearchEngine(
+                index=TfidfIndex(),
+                storage=FileSystemStorage(directory=cache_dir)
+            )
             self.use_new_search = True
-            logger.info("Using new RAG search components")
+            logger.info("Using new RAG search components with cache directory: {0}".format(cache_dir))
         except ImportError:
             logger.warning("New RAG search components not available, using direct file access")
 
