@@ -90,14 +90,24 @@ LLM.TabbedSidebar = {
             return;
         }
         
+        console.log("Rendering document list with", documents.length, "documents");
+        
+        // Clear the selectedDocuments array since we're re-rendering the list
+        this.selectedDocuments = [];
+        
         let html = '';
         documents.forEach(doc => {
-            const isSelected = this.selectedDocuments.includes(doc.id);
+            if (!doc.id) {
+                console.warn("Document missing ID, skipping:", doc);
+                return;
+            }
+            
+            const isSelected = false; // Start fresh with no selections
             html += `
                 <div class="document-item ${isSelected ? 'selected' : ''}" data-id="${doc.id}">
                     <div class="document-selector">
                         <input type="checkbox" class="document-checkbox" id="doc-${doc.id}" ${isSelected ? 'checked' : ''}>
-                        <label for="doc-${doc.id}" class="document-name">${doc.title}</label>
+                        <label for="doc-${doc.id}" class="document-name">${doc.title || 'Untitled'}</label>
                     </div>
                     <div class="document-meta">
                         ${doc.updated_at ? new Date(doc.updated_at).toLocaleDateString() : 'Sample document'}
@@ -333,9 +343,12 @@ LLM.TabbedSidebar = {
             checkbox.checked = true;
             
             // Add to selected documents if not already there
-            const docId = checkbox.getAttribute('data-id');
-            if (docId && !this.selectedDocuments.includes(docId)) {
-                this.selectedDocuments.push(docId);
+            const docItem = checkbox.closest('.document-item');
+            if (docItem) {
+                const docId = docItem.getAttribute('data-id');
+                if (docId && !this.selectedDocuments.includes(docId)) {
+                    this.selectedDocuments.push(docId);
+                }
             }
         });
     },
@@ -366,53 +379,52 @@ LLM.TabbedSidebar = {
         let addedCount = 0;
         let promises = [];
         
-        // Fetch each document from the API and add it to the context
-        this.selectedDocuments.forEach(docId => {
-            // Create a promise for each document fetch
-            const docPromise = window.API.RAG.getDocument(this.currentProjectId, docId)
-                .then(response => {
-                    console.log("Document fetch response:", response);
-                    // Check if we have data in the right format
-                    const doc = response && response.data ? response.data : response;
+        // Make a single API call to get documents for this project
+        window.API.RAG.getDocuments(this.currentProjectId)
+            .then(response => {
+                console.log("All documents response:", response);
+                // Get the list of all documents
+                const allDocs = response && response.data ? response.data : [];
+                
+                if (allDocs.length === 0) {
+                    console.warn("No documents found in project");
+                    return;
+                }
+                
+                // Filter to only the selected document IDs
+                const selectedDocs = allDocs.filter(doc => 
+                    this.selectedDocuments.includes(doc.id)
+                );
+                
+                console.log("Found", selectedDocs.length, "selected documents in the project");
+                
+                // Add each document to the context
+                selectedDocs.forEach(doc => {
+                    console.log("Adding document to context:", doc.title);
                     
-                    if (doc) {
-                        console.log("Adding document to context:", doc.title);
-                        
-                        // Add to window.ragState.contextDocuments if it exists
-                        if (window.ragState && window.ragState.contextDocuments) {
-                            if (!window.ragState.contextDocuments.some(d => d.id === doc.id)) {
-                                window.ragState.contextDocuments.push(doc);
-                                addedCount++;
-                                console.log("Added to ragState context");
-                            }
+                    // Add to window.ragState.contextDocuments if it exists
+                    if (window.ragState && window.ragState.contextDocuments) {
+                        if (!window.ragState.contextDocuments.some(d => d.id === doc.id)) {
+                            window.ragState.contextDocuments.push(doc);
+                            addedCount++;
+                            console.log("Added to ragState context");
                         }
-                        
-                        // Also try to add to the context manager if available
-                        if (window.LLM.Components && window.LLM.Components.ContextManager) {
-                            try {
-                                const added = window.LLM.Components.ContextManager.addDocument(doc);
-                                if (added && !window.ragState) {
-                                    addedCount++;
-                                    console.log("Added to ContextManager");
-                                }
-                            } catch (e) {
-                                console.error("Error adding to context manager:", e);
-                            }
-                        }
-                        
-                        return doc;
                     }
-                })
-                .catch(error => {
-                    console.error(`Error fetching document ${docId}:`, error);
+                    
+                    // Also try to add to the context manager if available
+                    if (window.LLM.Components && window.LLM.Components.ContextManager) {
+                        try {
+                            const added = window.LLM.Components.ContextManager.addDocument(doc);
+                            if (added && !window.ragState) {
+                                addedCount++;
+                                console.log("Added to ContextManager");
+                            }
+                        } catch (e) {
+                            console.error("Error adding to context manager:", e);
+                        }
+                    }
                 });
-            
-            promises.push(docPromise);
-        });
-        
-        // Wait for all documents to be fetched and added
-        Promise.all(promises)
-            .then(() => {
+                
                 // Update the context UI if function exists
                 if (typeof window.updateContextBar === 'function') {
                     window.updateContextBar();
@@ -428,9 +440,11 @@ LLM.TabbedSidebar = {
                 }
             })
             .catch(error => {
-                console.error("Error adding documents to context:", error);
-                alert("There was an error adding documents to context");
+                console.error("Error loading documents:", error);
+                alert("Error loading documents. Please try again.");
             });
+        
+        // No need for Promise.all anymore as we're handling everything in the API call above
     },
     
     handleKeyboardShortcuts: function(e) {
