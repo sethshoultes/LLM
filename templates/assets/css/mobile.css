@@ -1,0 +1,112 @@
+/**
+ * Mobile-specific styles for the RAG UI
+ */
+
+/* Mobile bottom tab bar */
+.mobile-tab-bar {
+    display: none;
+}
+
+@media (max-width: 767px) {
+    .mobile-tab-bar {
+        display: flex;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 60px;
+        background: white;
+        box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+        z-index: 90;
+        justify-content: space-around;
+        padding: 0;
+        border-top: 1px solid #eee;
+    }
+    
+    .mobile-tab-button {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        flex: 1;
+        color: #666;
+        text-decoration: none;
+        font-size: 0.8rem;
+        padding: 8px 0;
+        border: none;
+        background: none;
+        cursor: pointer;
+    }
+    
+    .mobile-tab-button.active {
+        color: #1890ff;
+    }
+    
+    .mobile-tab-icon {
+        font-size: 1.5rem;
+        margin-bottom: 4px;
+    }
+    
+    /* Adjust main content to account for bottom bar */
+    body {
+        padding-bottom: 70px;
+    }
+    
+    /* Card styles for mobile */
+    .card {
+        padding: 15px;
+        margin-bottom: 15px;
+    }
+    
+    /* Touch-friendly inputs */
+    button, 
+    input, 
+    select,
+    textarea {
+        font-size: 16px !important; /* Prevent iOS zoom */
+    }
+    
+    input[type="checkbox"] {
+        min-width: 20px;
+        min-height: 20px;
+    }
+    
+    /* Larger touch targets */
+    .context-item-remove,
+    .preview-btn,
+    .action-button {
+        min-width: 44px;
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    /* Improved form controls for touch */
+    .parameter-row {
+        margin-bottom: 15px;
+    }
+    
+    .parameter-row input[type="range"] {
+        height: 30px;
+    }
+}
+
+/* Portrait phone optimization */
+@media (max-width: 575px) {
+    h1 {
+        font-size: 1.5rem;
+    }
+    
+    h2 {
+        font-size: 1.2rem;
+    }
+    
+    .card {
+        padding: 12px;
+    }
+    
+    .mobile-tab-button {
+        font-size: 0.7rem;
+    }
+}

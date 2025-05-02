@@ -38,6 +38,15 @@ LLM.TabbedSidebar = {
         }, 3000);
     },
     
+    // Required methods for RAGSidebar compatibility
+    getSelectedDocuments: function() {
+        return this.selectedDocuments;
+    },
+    
+    getCurrentProject: function() {
+        return this.currentProjectId;
+    },
+    
     init: function() {
         this.setupEventListeners();
         this.setupMockData(); // This would be replaced with actual data in production
@@ -388,6 +397,7 @@ LLM.TabbedSidebar = {
                 
                 if (allDocs.length === 0) {
                     console.warn("No documents found in project");
+                    alert("No documents found in this project");
                     return;
                 }
                 
@@ -398,15 +408,23 @@ LLM.TabbedSidebar = {
                 
                 console.log("Found", selectedDocs.length, "selected documents in the project");
                 
+                // Check if we have any selected documents
+                if (selectedDocs.length === 0) {
+                    alert("No documents selected. Please select documents first.");
+                    return;
+                }
+                
                 // Add each document to the context
                 selectedDocs.forEach(doc => {
                     console.log("Adding document to context:", doc.title);
+                    
+                    let docAdded = false;
                     
                     // Add to window.ragState.contextDocuments if it exists
                     if (window.ragState && window.ragState.contextDocuments) {
                         if (!window.ragState.contextDocuments.some(d => d.id === doc.id)) {
                             window.ragState.contextDocuments.push(doc);
-                            addedCount++;
+                            docAdded = true;
                             console.log("Added to ragState context");
                         }
                     }
@@ -414,14 +432,25 @@ LLM.TabbedSidebar = {
                     // Also try to add to the context manager if available
                     if (window.LLM.Components && window.LLM.Components.ContextManager) {
                         try {
-                            const added = window.LLM.Components.ContextManager.addDocument(doc);
-                            if (added && !window.ragState) {
-                                addedCount++;
+                            if (!LLM.Components.ContextManager.documents.some(d => d.id === doc.id)) {
+                                LLM.Components.ContextManager.addDocument(doc);
+                                docAdded = true;
                                 console.log("Added to ContextManager");
                             }
                         } catch (e) {
                             console.error("Error adding to context manager:", e);
                         }
+                    }
+                    
+                    // Increment the counter if the document was added to any system
+                    if (docAdded) {
+                        addedCount++;
+                    }
+                    
+                    // Make sure the document ID is in the selectedDocuments array for RAGSidebar integration
+                    if (!this.selectedDocuments.includes(doc.id)) {
+                        this.selectedDocuments.push(doc.id);
+                        console.log("Added to selectedDocuments array for RAGSidebar integration");
                     }
                 });
                 
@@ -430,8 +459,12 @@ LLM.TabbedSidebar = {
                     window.updateContextBar();
                 }
                 
-                // Give feedback
-                alert(`Added ${addedCount} documents to context`);
+                // Give feedback (only if we actually added something)
+                if (addedCount > 0) {
+                    alert(`Added ${addedCount} documents to context`);
+                } else {
+                    console.log("No new documents were added to context");
+                }
                 
                 // Switch to the context tab
                 const contextTabBtn = document.querySelector('.tab-button[data-tab="context"]');
@@ -917,6 +950,15 @@ document.addEventListener('DOMContentLoaded', function() {
         // Initialize tabbed sidebar
         if (LLM.TabbedSidebar) {
             LLM.TabbedSidebar.init();
+            
+            // Register as LLM.Components.RAGSidebar
+            if (!LLM.Components) {
+                LLM.Components = {};
+            }
+            
+            // Set TabbedSidebar as the RAGSidebar component
+            // This enables context integration with the chat interface
+            LLM.Components.RAGSidebar = LLM.TabbedSidebar;
         }
         
         // Initialize document reordering
