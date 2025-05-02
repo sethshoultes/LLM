@@ -137,6 +137,20 @@ LLM.TabbedSidebar = {
                 const docId = btn.dataset.id;
                 if (window.viewDocument) {
                     window.viewDocument(docId);
+                } else if (window.ragState && typeof window.ragState.currentProject === 'string') {
+                    // Try to construct our own document viewing logic
+                    fetch(`/api/projects/${window.ragState.currentProject}/documents/${docId}`)
+                        .then(response => response.json())
+                        .then(doc => {
+                            if (doc && doc.title) {
+                                alert(`Document: ${doc.title}\n\nContent: ${doc.content.substring(0, 200)}${doc.content.length > 200 ? '...' : ''}`);
+                            } else {
+                                alert('Could not retrieve document details');
+                            }
+                        })
+                        .catch(error => {
+                            alert('Error fetching document: ' + error.message);
+                        });
                 } else {
                     alert('Document preview not available');
                 }
@@ -336,30 +350,54 @@ LLM.TabbedSidebar = {
             return;
         }
         
-        // Add all selected documents to context
-        if (LLM.Components && LLM.Components.ContextManager) {
-            let addedCount = 0;
-            
+        // Try to add documents to context
+        let addedCount = 0;
+        
+        // First attempt to use the RAG state directly
+        if (window.ragState) {
             this.selectedDocuments.forEach(docId => {
-                // Find the document in the current document list
-                const doc = LLM.Components.RAGSidebar && 
-                            LLM.Components.RAGSidebar.documents.find(d => d.id === docId);
+                // Find the document in the mock documents
+                const doc = this.mockDocuments.find(d => d.id === docId);
                 
                 if (doc) {
                     // Add to context if found
-                    const added = LLM.Components.ContextManager.addDocument(doc);
-                    if (added) addedCount++;
+                    if (!window.ragState.contextDocuments.some(d => d.id === doc.id)) {
+                        window.ragState.contextDocuments.push(doc);
+                        addedCount++;
+                    }
                 }
             });
             
-            // Give feedback
-            alert(`Added ${addedCount} documents to context`);
-            
-            // Switch to the context tab
-            const contextTabBtn = document.querySelector('.tab-button[data-tab="context"]');
-            if (contextTabBtn) {
-                contextTabBtn.click();
+            // Update the context UI if needed
+            if (typeof window.updateContextBar === 'function') {
+                window.updateContextBar();
             }
+        }
+        // Fallback to component manager if available
+        else if (LLM.Components && LLM.Components.ContextManager) {
+            this.selectedDocuments.forEach(docId => {
+                // Find the document in the mock documents
+                const doc = this.mockDocuments.find(d => d.id === docId);
+                
+                if (doc) {
+                    // Add to context if found
+                    try {
+                        const added = LLM.Components.ContextManager.addDocument(doc);
+                        if (added) addedCount++;
+                    } catch (e) {
+                        console.error("Error adding document to context:", e);
+                    }
+                }
+            });
+        }
+        
+        // Give feedback
+        alert(`Added ${addedCount} documents to context`);
+        
+        // Switch to the context tab
+        const contextTabBtn = document.querySelector('.tab-button[data-tab="context"]');
+        if (contextTabBtn) {
+            contextTabBtn.click();
         }
     },
     
@@ -846,17 +884,63 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         // Connect to existing RAG state if available
-        if (window.ragState && window.ragState.documents && LLM.TabbedSidebar) {
-            // Hook document selection events
-            LLM.TabbedSidebar.mockDocuments = window.ragState.documents;
-            LLM.TabbedSidebar.renderDocumentList(window.ragState.documents);
-            
-            // Connect project selector if needed
-            if (window.fetchProjects && window.populateProjectSelector) {
-                fetchProjects().then(projects => {
-                    populateProjectSelector(projects);
-                });
+        setTimeout(function() {
+            // Delay to ensure window.ragState is fully initialized
+            if (window.ragState) {
+                // Hook document selection events if documents are available
+                if (window.ragState.documents && window.ragState.documents.length > 0 && LLM.TabbedSidebar) {
+                    LLM.TabbedSidebar.mockDocuments = window.ragState.documents;
+                    LLM.TabbedSidebar.renderDocumentList(window.ragState.documents);
+                }
+                
+                // Setup project selector event listener
+                const projectSelect = document.getElementById('projectSelect');
+                if (projectSelect) {
+                    projectSelect.addEventListener('change', function() {
+                        const projectId = this.value;
+                        if (projectId && typeof window.selectProject === 'function') {
+                            window.selectProject(projectId);
+                        }
+                    });
+                }
+                
+                // Load projects manually if fetchProjects function exists
+                if (typeof window.fetchProjects === 'function') {
+                    window.fetchProjects().then(projects => {
+                        // Check if we have a function to populate the dropdown
+                        if (typeof window.populateProjectSelector === 'function') {
+                            window.populateProjectSelector(projects);
+                        } 
+                        // Or populate it directly
+                        else {
+                            const selector = document.getElementById('projectSelect');
+                            if (selector) {
+                                // Keep the default option
+                                const defaultOption = selector.querySelector('option[value=""]');
+                                selector.innerHTML = '';
+                                if (defaultOption) {
+                                    selector.appendChild(defaultOption);
+                                }
+                                
+                                // Add project options
+                                projects.forEach(project => {
+                                    const option = document.createElement('option');
+                                    option.value = project.id;
+                                    option.textContent = project.name;
+                                    selector.appendChild(option);
+                                });
+                                
+                                // Select the current project if set
+                                if (window.ragState.currentProject) {
+                                    selector.value = window.ragState.currentProject;
+                                }
+                            }
+                        }
+                    }).catch(error => {
+                        console.error("Error fetching projects:", error);
+                    });
+                }
             }
-        }
+        }, 1000); // 1 second delay to ensure ragState is initialized
     }
 });
