@@ -54,14 +54,29 @@ document.addEventListener('DOMContentLoaded', function() {
                     console.log("- Response:", response);
                     
                     // If projects exist, try to load documents for the first project
-                    if (response && response.projects && response.projects.length > 0) {
-                        const firstProject = response.projects[0];
+                    if (response && response.data && response.data.length > 0) {
+                        const firstProject = response.data[0];
                         console.log("\nTesting API.RAG.getDocuments for project:", firstProject.id);
                         
                         return window.API.RAG.getDocuments(firstProject.id)
                             .then(docResponse => {
                                 console.log("- API.RAG.getDocuments() successful");
-                                console.log("- Documents found:", docResponse.documents ? docResponse.documents.length : 0);
+                                console.log("- Documents response:", docResponse);
+                                console.log("- Documents found:", docResponse.data ? docResponse.data.length : 0);
+                                
+                                // Try to get a single document
+                                if (docResponse.data && docResponse.data.length > 0) {
+                                    const firstDoc = docResponse.data[0];
+                                    console.log("\nTesting API.RAG.getDocument for:", firstDoc.id);
+                                    
+                                    return window.API.RAG.getDocument(firstProject.id, firstDoc.id)
+                                        .then(singleDocResp => {
+                                            console.log("- API.RAG.getDocument() successful");
+                                            console.log("- Document response:", singleDocResp);
+                                            return { project: firstProject, docs: docResponse, singleDoc: singleDocResp };
+                                        });
+                                }
+                                
                                 return { project: firstProject, docs: docResponse };
                             });
                     }

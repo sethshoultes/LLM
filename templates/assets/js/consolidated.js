@@ -141,7 +141,11 @@ LLM.TabbedSidebar = {
                 } else if (this.currentProjectId) {
                     // Use the API to fetch document details
                     window.API.RAG.getDocument(this.currentProjectId, docId)
-                        .then(doc => {
+                        .then(response => {
+                            console.log("Document response:", response);
+                            // Check if we have data in the right format
+                            const doc = response && response.data ? response.data : response;
+                            
                             if (doc && doc.title) {
                                 // Show a basic preview of the document
                                 alert(`Document: ${doc.title}\n\nContent: ${doc.content.substring(0, 200)}${doc.content.length > 200 ? '...' : ''}`);
@@ -366,13 +370,20 @@ LLM.TabbedSidebar = {
         this.selectedDocuments.forEach(docId => {
             // Create a promise for each document fetch
             const docPromise = window.API.RAG.getDocument(this.currentProjectId, docId)
-                .then(doc => {
+                .then(response => {
+                    console.log("Document fetch response:", response);
+                    // Check if we have data in the right format
+                    const doc = response && response.data ? response.data : response;
+                    
                     if (doc) {
+                        console.log("Adding document to context:", doc.title);
+                        
                         // Add to window.ragState.contextDocuments if it exists
                         if (window.ragState && window.ragState.contextDocuments) {
                             if (!window.ragState.contextDocuments.some(d => d.id === doc.id)) {
                                 window.ragState.contextDocuments.push(doc);
                                 addedCount++;
+                                console.log("Added to ragState context");
                             }
                         }
                         
@@ -380,7 +391,10 @@ LLM.TabbedSidebar = {
                         if (window.LLM.Components && window.LLM.Components.ContextManager) {
                             try {
                                 const added = window.LLM.Components.ContextManager.addDocument(doc);
-                                if (added && !window.ragState) addedCount++;
+                                if (added && !window.ragState) {
+                                    addedCount++;
+                                    console.log("Added to ContextManager");
+                                }
                             } catch (e) {
                                 console.error("Error adding to context manager:", e);
                             }
@@ -909,17 +923,22 @@ document.addEventListener('DOMContentLoaded', function() {
                 projectSelect.addEventListener('change', function() {
                     const projectId = this.value;
                     if (projectId) {
+                        console.log("Loading documents for project:", projectId);
                         // Load documents for the selected project
                         window.API.RAG.getDocuments(projectId)
-                            .then(data => {
-                                if (data && data.documents) {
-                                    // Store the current project ID for later use
-                                    LLM.TabbedSidebar.currentProjectId = projectId;
-                                    
-                                    // Update the documents list
-                                    LLM.TabbedSidebar.mockDocuments = data.documents;
-                                    LLM.TabbedSidebar.renderDocumentList(data.documents);
-                                }
+                            .then(response => {
+                                console.log("Documents response:", response);
+                                // Check for data in the correct format
+                                const documents = response && response.data ? response.data : [];
+                                
+                                // Store the current project ID for later use
+                                LLM.TabbedSidebar.currentProjectId = projectId;
+                                
+                                // Update the documents list
+                                LLM.TabbedSidebar.mockDocuments = documents;
+                                LLM.TabbedSidebar.renderDocumentList(documents);
+                                
+                                console.log("Loaded " + documents.length + " documents");
                             })
                             .catch(error => {
                                 console.error("Error loading documents:", error);
@@ -932,8 +951,12 @@ document.addEventListener('DOMContentLoaded', function() {
             // Load projects from the API
             if (window.API && window.API.RAG) {
                 window.API.RAG.getProjects()
-                    .then(data => {
-                        if (data && data.projects) {
+                    .then(response => {
+                        console.log("Projects response:", response);
+                        // Check for data in the correct format
+                        const projects = response && response.data ? response.data : [];
+                        
+                        if (projects && projects.length > 0) {
                             const selector = document.getElementById('projectSelect');
                             if (selector) {
                                 // Keep the default option
@@ -944,12 +967,14 @@ document.addEventListener('DOMContentLoaded', function() {
                                 }
                                 
                                 // Add project options
-                                data.projects.forEach(project => {
+                                projects.forEach(project => {
                                     const option = document.createElement('option');
                                     option.value = project.id;
                                     option.textContent = project.name;
                                     selector.appendChild(option);
                                 });
+                                
+                                console.log("Added " + projects.length + " projects to dropdown");
                             }
                         }
                     })
