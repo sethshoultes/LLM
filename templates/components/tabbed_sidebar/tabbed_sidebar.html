@@ -1,0 +1,139 @@
+<div class="sidebar" id="sidebar">
+    <div class="drawer-handle" id="drawerHandle" title="Expand/Collapse"></div>
+    <div class="sidebar-toggle" title="Toggle Sidebar">❮</div>
+    <div class="sidebar-tabs" role="tablist">
+        <button class="tab-button active" id="documentsTabBtn" role="tab" aria-selected="true" aria-controls="documentsTab" data-tab="documents">Documents</button>
+        <button class="tab-button" id="contextTabBtn" role="tab" aria-selected="false" aria-controls="contextTab" data-tab="context">Context <span class="context-count">0</span></button>
+        <button class="tab-button" id="settingsTabBtn" role="tab" aria-selected="false" aria-controls="settingsTab" data-tab="settings">Settings</button>
+    </div>
+    <div class="tab-content">
+        <div class="tab-pane active" id="documentsTab" role="tabpanel" aria-labelledby="documentsTabBtn">
+            <div class="project-selector">
+                <label for="projectSelect" class="sr-only">Select project</label>
+                <select id="projectSelect" aria-label="Select project">
+                    <option value="">Select Project</option>
+                </select>
+                <button class="secondary-btn action-button" id="newProjectBtn">
+                    New Project
+                </button>
+            </div>
+            <div class="search-container">
+                <label for="documentSearch" class="sr-only">Search documents</label>
+                <input type="text" id="documentSearch" class="search-input" placeholder="Search documents..." aria-label="Search documents">
+                <button class="clear-search" id="clearSearch" aria-label="Clear search">×</button>
+            </div>
+            <div class="document-list" id="documentList" role="region" aria-label="Available documents">
+                <!-- Documents will be loaded here -->
+            </div>
+            <div class="select-action-container">
+                <button class="secondary-btn action-button" id="selectAllBtn">Select All</button>
+                <button class="secondary-btn action-button" id="deselectAllBtn">Deselect All</button>
+                <button class="primary-btn action-button" id="addSelectedBtn">Add Selected</button>
+            </div>
+            <div class="document-actions">
+                <button class="primary-btn action-button" id="uploadDocBtn">
+                    Upload Document
+                </button>
+            </div>
+        </div>
+        <div class="tab-pane" id="contextTab" role="tabpanel" aria-labelledby="contextTabBtn">
+            <div class="context-header">
+                <h3>Context Documents</h3>
+                <div class="context-controls">
+                    <button class="secondary-btn clear-context-btn" id="clearContextBtn">Clear All</button>
+                    <div class="toggle-switch">
+                        <label for="autoContextToggle">
+                            Auto-suggest:
+                            <span class="tooltip-container">
+                                <span class="tooltip-icon" aria-hidden="true">?</span>
+                                <span class="tooltip-content" role="tooltip">When enabled, the system automatically finds relevant documents for your questions.</span>
+                            </span>
+                        </label>
+                        <label class="switch">
+                            <input type="checkbox" id="autoContextToggle" checked aria-describedby="autoContextDescription">
+                            <span class="slider"></span>
+                        </label>
+                        <span id="autoContextDescription" class="sr-only">When enabled, the system automatically finds relevant documents for your questions.</span>
+                    </div>
+                </div>
+            </div>
+            <div class="context-items" id="contextItems" role="list" aria-label="Selected context documents">
+                <!-- Context documents will be loaded here -->
+            </div>
+            <div class="context-metadata" id="contextMetadata">
+                <!-- Metadata about context will be shown here -->
+            </div>
+            <div class="token-usage">
+                <div class="token-bar-container" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-labelledby="tokenLabel">
+                    <div class="token-bar">
+                        <div class="token-used" id="tokenUsed"></div>
+                    </div>
+                    <!-- Token contributions will be added here dynamically -->
+                </div>
+                <div class="token-label" id="tokenLabel">
+                    <span class="token-label-count"><span id="tokenCount">0</span>/<span id="tokenLimit">2048</span> tokens</span>
+                    <span class="token-label-status" id="tokenStatus">Low usage</span>
+                </div>
+            </div>
+        </div>
+        <div class="tab-pane" id="settingsTab" role="tabpanel" aria-labelledby="settingsTabBtn">
+            <div class="settings-section">
+                <h3>Model Selection</h3>
+                <div class="model-select-container">
+                    <label for="modelSelect">Model:</label>
+                    <select id="modelSelect" aria-describedby="modelSelectTip">
+                        <option value="">Select a model</option>
+                    </select>
+                    <div id="modelSelectTip" class="sr-only">Choose an AI model to generate responses</div>
+                </div>
+                
+                <h3>Generation Parameters</h3>
+                <div class="parameter-row">
+                    <label for="temperature" title="Controls randomness: higher values make output more random, lower values make it more deterministic">
+                        Temperature: <span id="temperatureValue">0.7</span>
+                    </label>
+                    <input type="range" id="temperature" min="0.1" max="2.0" step="0.1" value="0.7" 
+                           oninput="document.getElementById('temperatureValue').textContent = this.value"
+                           aria-describedby="temperatureDescription">
+                    <div id="temperatureDescription" class="sr-only">Controls randomness: higher values make output more random, lower values make it more deterministic</div>
+                </div>
+                <div class="parameter-row">
+                    <label for="maxTokens" title="Maximum number of tokens to generate in the response">
+                        Max Tokens: <span id="maxTokensValue">1024</span>
+                    </label>
+                    <input type="range" id="maxTokens" min="64" max="4096" step="64" value="1024" 
+                           oninput="document.getElementById('maxTokensValue').textContent = this.value"
+                           aria-describedby="maxTokensDescription">
+                    <div id="maxTokensDescription" class="sr-only">Maximum number of tokens to generate in the response</div>
+                </div>
+                <div class="parameter-row">
+                    <label for="topP" title="Controls diversity via nucleus sampling: 0.9 means consider only tokens comprising the top 90% probability mass">
+                        Top P: <span id="topPValue">0.95</span>
+                    </label>
+                    <input type="range" id="topP" min="0.05" max="1.0" step="0.05" value="0.95" 
+                           oninput="document.getElementById('topPValue').textContent = this.value"
+                           aria-describedby="topPDescription">
+                    <div id="topPDescription" class="sr-only">Controls diversity via nucleus sampling: 0.9 means consider only tokens comprising the top 90% probability mass</div>
+                </div>
+                <div class="parameter-row">
+                    <label for="freqPenalty" title="Reduces repetition by lowering the probability of tokens that have already appeared in the text">
+                        Frequency Penalty: <span id="freqPenaltyValue">0.0</span>
+                    </label>
+                    <input type="range" id="freqPenalty" min="0.0" max="2.0" step="0.1" value="0.0" 
+                           oninput="document.getElementById('freqPenaltyValue').textContent = this.value"
+                           aria-describedby="freqPenaltyDescription">
+                    <div id="freqPenaltyDescription" class="sr-only">Reduces repetition by lowering the probability of tokens that have already appeared in the text</div>
+                </div>
+                
+                <h3>System Prompt</h3>
+                <div class="system-prompt-container">
+                    <label for="systemInput" id="systemInputLabel" class="sr-only">System prompt</label>
+                    <textarea id="systemInput" placeholder="Instructions for the model (optional)" style="height: 80px;" aria-labelledby="systemInputLabel" aria-describedby="systemInputTip"></textarea>
+                    <div class="prompt-tips">
+                        <small id="systemInputTip">Use the system prompt to set the behavior or knowledge context for the model.</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

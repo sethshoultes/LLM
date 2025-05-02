@@ -400,82 +400,15 @@ input:checked + .slider:before {
 """
 
 # HTML templates for the sidebar and dialogs
+# Using tabbed sidebar component instead of sidebar
 RAG_SIDEBAR_HTML = """
-<div class="sidebar" id="sidebar">
-    <div class="sidebar-section">
-        <div class="project-selector">
-            <select id="projectSelect">
-                <option value="">Select Project</option>
-            </select>
-            <button class="secondary-btn action-button" id="newProjectBtn">
-                New Project
-            </button>
-        </div>
-        <div class="project-info" id="projectInfo">
-            No project selected
-        </div>
-    </div>
-    
-    <div class="sidebar-section">
-        <div class="action-bar">
-            <button class="secondary-btn action-button" id="addDocumentBtn">
-                Add Document
-            </button>
-            <div class="spacer"></div>
-            <button class="secondary-btn action-button" id="refreshDocsBtn">
-                ↻
-            </button>
-        </div>
-        
-        <div class="search-container">
-            <input type="text" class="search-input" id="documentSearch" placeholder="Search documents...">
-            <button class="clear-search" id="clearSearch">×</button>
-        </div>
-    </div>
-    
-    <div class="document-list" id="documentList">
-        <div class="empty-state">No documents found</div>
-    </div>
-</div>
+<!-- Sidebar now uses tabbed_sidebar -->
+{% include "components/tabbed_sidebar/tabbed_sidebar.html" %}
 """
 
+# Using tabbed sidebar component instead of context bar
 RAG_CONTEXT_BAR_HTML = """
-<div class="context-bar" id="contextBar">
-    <div class="context-header">
-        <h3>Context Documents</h3>
-        <div class="context-controls">
-            <button class="secondary-btn clear-context-btn" id="clearContextBtn">Clear All</button>
-            <div class="toggle-switch">
-                <label for="autoContextToggle">
-                    Auto-suggest:
-                    <span class="tooltip-container">
-                        <span class="tooltip-icon">?</span>
-                        <span class="tooltip-content">When enabled, the system automatically finds relevant documents for your questions.</span>
-                    </span>
-                </label>
-                <label class="switch">
-                    <input type="checkbox" id="autoContextToggle" checked>
-                    <span class="slider"></span>
-                </label>
-            </div>
-        </div>
-    </div>
-    <div class="context-items" id="contextItems"></div>
-    
-    <div class="context-stats" id="contextStats">
-        <div class="token-usage">
-            <div class="token-bar">
-                <div class="token-used" id="tokenUsed" style="width: 0%"></div>
-            </div>
-            <div class="token-info">
-                <span id="tokenCount">0</span> tokens used
-                (<span id="tokenPercentage">0%</span> of context window)
-            </div>
-        </div>
-    </div>
-    
-    <!-- Hint text replaced with tooltip -->
-</div>
+<!-- Context functionality is now integrated into the tabbed sidebar -->
 """
 
 RAG_DIALOGS_HTML = """
@@ -1518,7 +1451,6 @@ def get_rag_ui_extensions():
     """
     extensions = {
         "HEAD": f"<style>{RAG_CSS}</style>",
-        "SIDEBAR": RAG_SIDEBAR_HTML,
         "MAIN_CONTROLS": RAG_CONTEXT_BAR_HTML,
         "DIALOGS": RAG_DIALOGS_HTML,
         "SCRIPTS": f"<script>{RAG_JAVASCRIPT}</script>",
